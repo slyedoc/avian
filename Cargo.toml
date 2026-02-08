@@ -8,5 +8,12 @@ alloc_instead_of_core = "warn"
 std_instead_of_alloc = "warn"
 std_instead_of_core = "warn"
 
+[patch.crates-io]
+parry3d = { git = "https://github.com/slyedoc/parry", branch = "bevy-main" }
+parry3d-f64 = { git = "https://github.com/slyedoc/parry", branch = "bevy-main" }
+parry2d = { git = "https://github.com/slyedoc/parry", branch = "bevy-main" }
+parry2d-f64 = { git = "https://github.com/slyedoc/parry", branch = "bevy-main" }
+glamx = { git = "https://github.com/slyedoc/glamx", branch = "bevy-main" }
+
 [profile.dev]
 opt-level = 1 # Use slightly better optimization, so examples work
