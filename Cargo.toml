@@ -14,7 +14,6 @@ parry3d-f64 = { git = "https://github.com/slyedoc/parry", branch = "bevy-main" }
 parry2d = { git = "https://github.com/slyedoc/parry", branch = "bevy-main" }
 parry2d-f64 = { git = "https://github.com/slyedoc/parry", branch = "bevy-main" }
 glamx = { git = "https://github.com/slyedoc/glamx", branch = "bevy-main" }
-obvhs = { git = "https://github.com/DGriffin91/obvhs", branch = "main" }
 
 [profile.dev]
 opt-level = 1 # Use slightly better optimization, so examples work

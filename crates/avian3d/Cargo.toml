@@ -93,7 +93,7 @@ libm = { version = "0.2", optional = true }
 approx = "0.5"
 parry3d = { version = "0.26", optional = true }
 parry3d-f64 = { version = "0.26", optional = true }
-obvhs = { version = "0.3" }
+obvhs = { git = "https://github.com/DGriffin91/obvhs", branch = "main" }
 serde = { version = "1", features = ["derive"], optional = true }
 derive_more = "2"
 thiserror = "2"
