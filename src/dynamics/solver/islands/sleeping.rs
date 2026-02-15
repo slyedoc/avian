@@ -8,7 +8,7 @@ use bevy::{
         entity::Entity,
         entity_disabling::Disabled,
         error::Result,
-        lifecycle::{HookContext, Insert, Replace},
+        lifecycle::{Discard, HookContext, Insert},
         observer::On,
         query::{Changed, Has, Or, With, Without},
         resource::Resource,
@@ -123,7 +123,7 @@ fn wake_on_remove_sleeping(mut world: DeferredWorld, ctx: HookContext) {
 }
 
 fn wake_on_replace_rigid_body(
-    trigger: On<Replace, RigidBody>,
+    trigger: On<Discard, RigidBody>,
     mut commands: Commands,
     query: Query<&BodyIslandNode>,
 ) {

@@ -72,7 +72,7 @@ fn setup_key_instructions(mut commands: Commands) {
     commands.spawn((
         Text::new("U: Diagnostics UI | P: Pause/Unpause | Enter: Step"),
         TextFont {
-            font_size: 10.0,
+            font_size: FontSize::Px(10.0),
             ..default()
         },
         Node {

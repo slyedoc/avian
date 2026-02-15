@@ -193,9 +193,9 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
         // Cases 4
         // Note: We use `Replace` here to run before Case 2.
         app.add_observer(
-            add_to_tree_on::<Replace, Disabled, (Without<ColliderDisabled>, Allow<Disabled>)>,
+            add_to_tree_on::<Discard, Disabled, (Without<ColliderDisabled>, Allow<Disabled>)>,
         );
-        app.add_observer(add_to_tree_on::<Replace, ColliderDisabled, ()>);
+        app.add_observer(add_to_tree_on::<Discard, ColliderDisabled, ()>);
 
         // Case 5
         app.add_observer(
@@ -321,7 +321,7 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
 
         // Case 9
         app.add_observer(
-            |trigger: On<Insert, CollisionLayers>,
+            |trigger: On<Discard, CollisionLayers>,
              mut collider_query: Query<
                 (&ColliderTreeProxyKey, Option<&CollisionLayers>),
                 Without<ColliderDisabled>,
@@ -344,7 +344,7 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
 
         // Case 10
         app.add_observer(
-            |trigger: On<Insert, ActiveCollisionHooks>,
+            |trigger: On<Discard, ActiveCollisionHooks>,
              mut collider_query: Query<
                 (&ColliderTreeProxyKey, Option<&ActiveCollisionHooks>),
                 Without<ColliderDisabled>,
@@ -371,7 +371,7 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
 
         // Case 11
         app.add_observer(
-            |trigger: On<Replace, RigidBodyDisabled>,
+            |trigger: On<Discard, RigidBodyDisabled>,
              body_query: Query<(&RigidBodyColliders, Has<RigidBodyDisabled>)>,
              mut collider_query: Query<&ColliderTreeProxyKey, Without<ColliderDisabled>>,
              mut trees: ResMut<ColliderTrees>| {
