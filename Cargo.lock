@@ -395,7 +395,7 @@ dependencies = [
  "glam_matrix_extras",
  "itertools 0.14.0",
  "libm",
- "obvhs",
+ "obvhs 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "parry2d",
  "parry2d-f64",
  "serde",
@@ -423,7 +423,7 @@ dependencies = [
  "glam_matrix_extras",
  "itertools 0.14.0",
  "libm",
- "obvhs",
+ "obvhs 0.3.0 (git+https://github.com/DGriffin91/obvhs?branch=main)",
  "parry3d",
  "parry3d-f64",
  "rand",
@@ -4647,6 +4647,19 @@ name = "obvhs"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f317a1c29744b0e63bdf1733443fad6805a86ab6db403671f945456041cc84b3"
+dependencies = [
+ "bytemuck",
+ "glam",
+ "half",
+ "log",
+ "rdst",
+ "static_assertions",
+]
+
+[[package]]
+name = "obvhs"
+version = "0.3.0"
+source = "git+https://github.com/DGriffin91/obvhs?branch=main#267378ba6c39addbb6678355a2570cf7044732d5"
 dependencies = [
  "bytemuck",
  "glam",
