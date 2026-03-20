@@ -304,7 +304,7 @@ impl Command<Result> for SleepBody {
                         mut islands,
                         mut contact_graph,
                         mut joint_graph,
-                    ) = state.0.get_mut(world);
+                    ) = state.0.get_mut(world).expect("Failed to get system state");
 
                     let Some(island) = islands.get_mut(island_id) else {
                         return;
@@ -364,7 +364,7 @@ impl Command for SleepIslands {
     fn apply(self, world: &mut World) {
         world.try_resource_scope(|world, mut state: Mut<CachedIslandSleepingSystemState>| {
             let (bodies, mut islands, mut contact_graph, mut constraint_graph) =
-                state.0.get_mut(world);
+                state.0.get_mut(world).expect("Failed to get system state");
 
             let mut bodies_to_sleep = Vec::<(Entity, Sleeping)>::new();
 
@@ -474,7 +474,7 @@ impl Command for WakeIslands {
     fn apply(self, world: &mut World) {
         world.try_resource_scope(|world, mut state: Mut<CachedIslandWakingSystemState>| {
             let (mut bodies, mut islands, mut contact_graph, mut constraint_graph) =
-                state.0.get_mut(world);
+                state.0.get_mut(world).expect("Failed to get system state");
 
             let mut bodies_to_wake = Vec::<Entity>::new();
 
