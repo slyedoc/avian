@@ -391,11 +391,11 @@ dependencies = [
  "derive_more",
  "disqualified",
  "examples_common_2d",
- "glam",
+ "glam 0.31.1",
  "glam_matrix_extras",
  "itertools 0.14.0",
  "libm",
- "obvhs 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "obvhs",
  "parry2d",
  "parry2d-f64",
  "serde",
@@ -423,7 +423,7 @@ dependencies = [
  "glam_matrix_extras",
  "itertools 0.14.0",
  "libm",
- "obvhs 0.3.0 (git+https://github.com/DGriffin91/obvhs?branch=main)",
+ "obvhs",
  "parry3d",
  "parry3d-f64",
  "rand",
@@ -1461,7 +1461,7 @@ dependencies = [
  "arrayvec",
  "bevy_reflect 0.19.0-dev (git+https://github.com/bevyengine/bevy?branch=main)",
  "derive_more",
- "glam",
+ "glam 0.31.1",
  "itertools 0.14.0",
  "libm",
  "rand",
@@ -1480,7 +1480,7 @@ dependencies = [
  "arrayvec",
  "bevy_reflect 0.19.0-dev (git+https://github.com/bevyengine/bevy)",
  "derive_more",
- "glam",
+ "glam 0.31.1",
  "itertools 0.14.0",
  "rand",
  "rand_distr",
@@ -1712,7 +1712,7 @@ dependencies = [
  "downcast-rs 2.0.2",
  "erased-serde",
  "foldhash 0.2.0",
- "glam",
+ "glam 0.31.1",
  "indexmap",
  "inventory",
  "petgraph",
@@ -1740,7 +1740,7 @@ dependencies = [
  "downcast-rs 2.0.2",
  "erased-serde",
  "foldhash 0.2.0",
- "glam",
+ "glam 0.31.1",
  "indexmap",
  "inventory",
  "serde",
@@ -1813,7 +1813,7 @@ dependencies = [
  "downcast-rs 2.0.2",
  "encase",
  "fixedbitset",
- "glam",
+ "glam 0.31.1",
  "image",
  "indexmap",
  "js-sys",
@@ -1865,7 +1865,7 @@ dependencies = [
  "downcast-rs 2.0.2",
  "encase",
  "fixedbitset",
- "glam",
+ "glam 0.31.1",
  "image",
  "indexmap",
  "js-sys",
@@ -3517,13 +3517,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "glam"
+version = "0.32.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f70749695b063ecbf6b62949ccccde2e733ec3ecbbd71d467dca4e5c6c97cca0"
+dependencies = [
+ "approx",
+ "bytemuck",
+ "libm",
+ "serde_core",
+]
+
+[[package]]
 name = "glam_matrix_extras"
 version = "0.2.0-dev"
 source = "git+https://github.com/slyedoc/glam_matrix_extras?branch=bevy-main#388f77852de4fc860842ada4dca679d51ba38c4b"
 dependencies = [
  "approx",
  "bevy_reflect 0.19.0-dev (git+https://github.com/bevyengine/bevy?branch=main)",
- "glam",
+ "glam 0.31.1",
  "libm",
  "serde",
 ]
@@ -3531,10 +3543,10 @@ dependencies = [
 [[package]]
 name = "glamx"
 version = "0.1.3"
-source = "git+https://github.com/slyedoc/glamx?branch=bevy-main#f655cc7f2bdf611c1050c53b97027f3e2c39cdf0"
+source = "git+https://github.com/slyedoc/glamx?branch=bevy-main#3495702f60003b5e89883e1476ec1de9504d945b"
 dependencies = [
  "approx",
- "glam",
+ "glam 0.32.1",
  "num-traits",
  "serde",
  "simba",
@@ -3751,7 +3763,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c1276a77c583f9d6e20467188586366c5cdcb0bccbe6326c654b3f552db7d20"
 dependencies = [
  "constgebra",
- "glam",
+ "glam 0.31.1",
  "tinyvec",
 ]
 
@@ -4645,24 +4657,10 @@ dependencies = [
 [[package]]
 name = "obvhs"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f317a1c29744b0e63bdf1733443fad6805a86ab6db403671f945456041cc84b3"
+source = "git+https://github.com/slyedoc/obvhs?branch=bevy-main#95dc84bc9503754735c7278a35ac61bfe39f8631"
 dependencies = [
  "bytemuck",
- "glam",
- "half",
- "log",
- "rdst",
- "static_assertions",
-]
-
-[[package]]
-name = "obvhs"
-version = "0.3.0"
-source = "git+https://github.com/DGriffin91/obvhs?branch=main#267378ba6c39addbb6678355a2570cf7044732d5"
-dependencies = [
- "bytemuck",
- "glam",
+ "glam 0.32.1",
  "half",
  "log",
  "rdst",
@@ -4790,7 +4788,7 @@ dependencies = [
 [[package]]
 name = "parry2d"
 version = "0.26.0"
-source = "git+https://github.com/slyedoc/parry?branch=bevy-main#aa3d8f5deb1142c5123b66b0224edd3a70bd86c4"
+source = "git+https://github.com/slyedoc/parry?branch=bevy-main#59efe8618b7476d4c0c5fc53e017dba855dc75a6"
 dependencies = [
  "approx",
  "arrayvec",
@@ -4819,7 +4817,7 @@ dependencies = [
 [[package]]
 name = "parry2d-f64"
 version = "0.26.0"
-source = "git+https://github.com/slyedoc/parry?branch=bevy-main#aa3d8f5deb1142c5123b66b0224edd3a70bd86c4"
+source = "git+https://github.com/slyedoc/parry?branch=bevy-main#59efe8618b7476d4c0c5fc53e017dba855dc75a6"
 dependencies = [
  "approx",
  "arrayvec",
@@ -4848,7 +4846,7 @@ dependencies = [
 [[package]]
 name = "parry3d"
 version = "0.26.0"
-source = "git+https://github.com/slyedoc/parry?branch=bevy-main#aa3d8f5deb1142c5123b66b0224edd3a70bd86c4"
+source = "git+https://github.com/slyedoc/parry?branch=bevy-main#59efe8618b7476d4c0c5fc53e017dba855dc75a6"
 dependencies = [
  "approx",
  "arrayvec",
@@ -4879,7 +4877,7 @@ dependencies = [
 [[package]]
 name = "parry3d-f64"
 version = "0.26.0"
-source = "git+https://github.com/slyedoc/parry?branch=bevy-main#aa3d8f5deb1142c5123b66b0224edd3a70bd86c4"
+source = "git+https://github.com/slyedoc/parry?branch=bevy-main#59efe8618b7476d4c0c5fc53e017dba855dc75a6"
 dependencies = [
  "approx",
  "arrayvec",
