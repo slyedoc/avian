@@ -8,7 +8,6 @@ pub use plugin::ColliderHierarchyPlugin;
 use crate::prelude::*;
 use bevy::{
     ecs::{
-        error::CommandWithEntity,
         lifecycle::HookContext,
         relationship::{Relationship, RelationshipHookMode, RelationshipSourceCollection},
         world::DeferredWorld,
