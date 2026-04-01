@@ -325,28 +325,30 @@ impl Default for ContactSoftnessCoefficients {
 }
 
 fn update_contact_softness(
-    solver_query: Single<(Ref<SolverConfig>, &mut ContactSoftnessCoefficients)>,
+    mut worlds: Query<(Ref<SolverConfig>, &mut ContactSoftnessCoefficients), With<PhysicsWorld>>,
     physics_time: Res<Time<Physics>>,
     substep_time: Res<Time<Substeps>>,
 ) {
-    let (solver_config, mut coefficients) = solver_query.into_inner();
-    if solver_config.is_changed() || physics_time.is_changed() || substep_time.is_changed() {
-        let dt = physics_time.delta_secs_f64() as Scalar;
-        let h = substep_time.delta_secs_f64() as Scalar;
+    for (solver_config, mut coefficients) in worlds.iter_mut() {
+        if solver_config.is_changed() || physics_time.is_changed() || substep_time.is_changed() {
+            let dt = physics_time.delta_secs_f64() as Scalar;
+            let h = substep_time.delta_secs_f64() as Scalar;
 
-        // The contact frequency should at most be half of the time step due to Nyquist's theorem.
-        // https://en.wikipedia.org/wiki/Nyquist%E2%80%93Shannon_sampling_theorem
-        let max_hz = 1.0 / (dt * 2.0);
-        let hz = solver_config.contact_frequency_factor * max_hz.min(0.25 / h);
+            // The contact frequency should at most be half of the time step due to Nyquist's theorem.
+            // https://en.wikipedia.org/wiki/Nyquist%E2%80%93Shannon_sampling_theorem
+            let max_hz = 1.0 / (dt * 2.0);
+            let hz = solver_config.contact_frequency_factor * max_hz.min(0.25 / h);
 
-        coefficients.dynamic = SoftnessParameters::new(solver_config.contact_damping_ratio, hz)
-            .compute_coefficients(h);
+            coefficients.dynamic =
+                SoftnessParameters::new(solver_config.contact_damping_ratio, hz)
+                    .compute_coefficients(h);
 
-        // TODO: Perhaps the non-dynamic softness should be configurable separately.
-        // Make contacts against static and kinematic bodies stiffer to avoid clipping through the environment.
-        coefficients.non_dynamic =
-            SoftnessParameters::new(solver_config.contact_damping_ratio, 2.0 * hz)
-                .compute_coefficients(h);
+            // TODO: Perhaps the non-dynamic softness should be configurable separately.
+            // Make contacts against static and kinematic bodies stiffer to avoid clipping through the environment.
+            coefficients.non_dynamic =
+                SoftnessParameters::new(solver_config.contact_damping_ratio, 2.0 * hz)
+                    .compute_coefficients(h);
+        }
     }
 }
 
@@ -362,13 +364,19 @@ pub(super) struct BodyQuery {
 }
 
 fn prepare_contact_constraints(
-    contact_graph: Single<&ContactGraph>,
-    mut constraint_graph: Single<&mut ConstraintGraph>,
-    mut diagnostics: Single<&mut SolverDiagnostics>,
+    mut worlds: Query<
+        (
+            &ContactGraph,
+            &mut ConstraintGraph,
+            &mut SolverDiagnostics,
+            &NarrowPhaseConfig,
+            &ContactSoftnessCoefficients,
+        ),
+        With<PhysicsWorld>,
+    >,
     bodies: Query<BodyQuery, RigidBodyActiveFilter>,
-    narrow_phase_config: Single<&NarrowPhaseConfig>,
-    contact_softness: Single<&ContactSoftnessCoefficients>,
 ) {
+    for (contact_graph, mut constraint_graph, mut diagnostics, narrow_phase_config, contact_softness) in worlds.iter_mut() {
     let start = crate::utils::Instant::now();
 
     for color in constraint_graph.colors.iter_mut() {
@@ -446,6 +454,7 @@ fn prepare_contact_constraints(
         .iter()
         .map(|color| color.contact_constraints.len())
         .sum::<usize>() as u32;
+    }
 }
 
 /// Warm starts the solver by applying the impulses from the previous frame or substep.
@@ -453,33 +462,33 @@ fn prepare_contact_constraints(
 /// See [`SubstepSolverSystems::WarmStart`] for more information.
 fn warm_start(
     bodies: Query<(&mut SolverBody, &SolverBodyInertia)>,
-    mut constraint_graph: Single<&mut ConstraintGraph>,
-    solver_config: Single<&SolverConfig>,
-    mut diagnostics: Single<&mut SolverDiagnostics>,
+    mut worlds: Query<(&mut ConstraintGraph, &SolverConfig, &mut SolverDiagnostics), With<PhysicsWorld>>,
 ) {
-    let start = crate::utils::Instant::now();
+    for (mut constraint_graph, solver_config, mut diagnostics) in worlds.iter_mut() {
+        let start = crate::utils::Instant::now();
 
-    // Warm start overflow constraints serially. They have lower priority, so they are solved first.
-    for constraint in constraint_graph.colors[COLOR_OVERFLOW_INDEX]
-        .contact_constraints
-        .iter_mut()
-    {
-        warm_start_internal(&bodies, constraint, solver_config.warm_start_coefficient);
-    }
-
-    // Warm start constraints in each color in parallel.
-    for color in constraint_graph
-        .colors
-        .iter_mut()
-        .take(COLOR_OVERFLOW_INDEX)
-        .filter(|color| !color.contact_constraints.is_empty())
-    {
-        crate::utils::par_for_each(&mut color.contact_constraints, 64, |_i, constraint| {
+        // Warm start overflow constraints serially. They have lower priority, so they are solved first.
+        for constraint in constraint_graph.colors[COLOR_OVERFLOW_INDEX]
+            .contact_constraints
+            .iter_mut()
+        {
             warm_start_internal(&bodies, constraint, solver_config.warm_start_coefficient);
-        });
-    }
+        }
 
-    diagnostics.warm_start += start.elapsed();
+        // Warm start constraints in each color in parallel.
+        for color in constraint_graph
+            .colors
+            .iter_mut()
+            .take(COLOR_OVERFLOW_INDEX)
+            .filter(|color| !color.contact_constraints.is_empty())
+        {
+            crate::utils::par_for_each(&mut color.contact_constraints, 64, |_i, constraint| {
+                warm_start_internal(&bodies, constraint, solver_config.warm_start_coefficient);
+            });
+        }
+
+        diagnostics.warm_start += start.elapsed();
+    }
 }
 
 fn warm_start_internal(
@@ -531,51 +540,53 @@ fn warm_start_internal(
 #[allow(clippy::type_complexity)]
 fn solve_contacts<const USE_BIAS: bool>(
     bodies: Query<(&mut SolverBody, &SolverBodyInertia)>,
-    mut constraint_graph: Single<&mut ConstraintGraph>,
-    solver_config: Single<&SolverConfig>,
-    length_unit: Single<&PhysicsLengthUnit>,
+    mut worlds: Query<
+        (&mut ConstraintGraph, &SolverConfig, &PhysicsLengthUnit, &mut SolverDiagnostics),
+        With<PhysicsWorld>,
+    >,
     time: Res<Time>,
-    mut diagnostics: Single<&mut SolverDiagnostics>,
 ) {
-    let start = crate::utils::Instant::now();
+    for (mut constraint_graph, solver_config, length_unit, mut diagnostics) in worlds.iter_mut() {
+        let start = crate::utils::Instant::now();
 
-    let delta_secs = time.delta_seconds_adjusted();
-    let max_overlap_solve_speed = solver_config.max_overlap_solve_speed * length_unit.0;
+        let delta_secs = time.delta_seconds_adjusted();
+        let max_overlap_solve_speed = solver_config.max_overlap_solve_speed * length_unit.0;
 
-    // Solve overflow constraints serially. They have lower priority, so they are solved first.
-    for constraint in constraint_graph.colors[COLOR_OVERFLOW_INDEX]
-        .contact_constraints
-        .iter_mut()
-    {
-        solve_contacts_internal::<USE_BIAS>(
-            &bodies,
-            constraint,
-            max_overlap_solve_speed,
-            delta_secs,
-        );
-    }
-
-    // Solve contact constraints in each color in parallel.
-    for color in constraint_graph
-        .colors
-        .iter_mut()
-        .take(COLOR_OVERFLOW_INDEX)
-        .filter(|color| !color.contact_constraints.is_empty())
-    {
-        crate::utils::par_for_each(&mut color.contact_constraints, 64, |_i, constraint| {
+        // Solve overflow constraints serially. They have lower priority, so they are solved first.
+        for constraint in constraint_graph.colors[COLOR_OVERFLOW_INDEX]
+            .contact_constraints
+            .iter_mut()
+        {
             solve_contacts_internal::<USE_BIAS>(
                 &bodies,
                 constraint,
                 max_overlap_solve_speed,
                 delta_secs,
             );
-        });
-    }
+        }
 
-    if USE_BIAS {
-        diagnostics.solve_constraints += start.elapsed();
-    } else {
-        diagnostics.relax_velocities += start.elapsed();
+        // Solve contact constraints in each color in parallel.
+        for color in constraint_graph
+            .colors
+            .iter_mut()
+            .take(COLOR_OVERFLOW_INDEX)
+            .filter(|color| !color.contact_constraints.is_empty())
+        {
+            crate::utils::par_for_each(&mut color.contact_constraints, 64, |_i, constraint| {
+                solve_contacts_internal::<USE_BIAS>(
+                    &bodies,
+                    constraint,
+                    max_overlap_solve_speed,
+                    delta_secs,
+                );
+            });
+        }
+
+        if USE_BIAS {
+            diagnostics.solve_constraints += start.elapsed();
+        } else {
+            diagnostics.relax_velocities += start.elapsed();
+        }
     }
 }
 
@@ -630,47 +641,49 @@ fn solve_contacts_internal<const USE_BIAS: bool>(
 #[allow(clippy::type_complexity)]
 fn solve_restitution(
     bodies: Query<(&mut SolverBody, &SolverBodyInertia)>,
-    mut constraint_graph: Single<&mut ConstraintGraph>,
-    solver_config: Single<&SolverConfig>,
-    length_unit: Single<&PhysicsLengthUnit>,
-    mut diagnostics: Single<&mut SolverDiagnostics>,
+    mut worlds: Query<
+        (&mut ConstraintGraph, &SolverConfig, &PhysicsLengthUnit, &mut SolverDiagnostics),
+        With<PhysicsWorld>,
+    >,
 ) {
-    let start = crate::utils::Instant::now();
+    for (mut constraint_graph, solver_config, length_unit, mut diagnostics) in worlds.iter_mut() {
+        let start = crate::utils::Instant::now();
 
-    // The restitution threshold determining the speed required for restitution to be applied.
-    let threshold = solver_config.restitution_threshold * length_unit.0;
+        // The restitution threshold determining the speed required for restitution to be applied.
+        let threshold = solver_config.restitution_threshold * length_unit.0;
 
-    // Solve restitution for overflow constraints serially. They have lower priority, so they are solved first.
-    for constraint in constraint_graph.colors[COLOR_OVERFLOW_INDEX]
-        .contact_constraints
-        .iter_mut()
-    {
-        solve_restitution_internal(
-            &bodies,
-            constraint,
-            threshold,
-            solver_config.restitution_iterations,
-        );
-    }
-
-    // Solve restitution for contact constraints in each color in parallel.
-    for color in constraint_graph
-        .colors
-        .iter_mut()
-        .take(COLOR_OVERFLOW_INDEX)
-        .filter(|color| !color.contact_constraints.is_empty())
-    {
-        crate::utils::par_for_each(&mut color.contact_constraints, 64, |_i, constraint| {
+        // Solve restitution for overflow constraints serially. They have lower priority, so they are solved first.
+        for constraint in constraint_graph.colors[COLOR_OVERFLOW_INDEX]
+            .contact_constraints
+            .iter_mut()
+        {
             solve_restitution_internal(
                 &bodies,
                 constraint,
                 threshold,
                 solver_config.restitution_iterations,
             );
-        });
-    }
+        }
 
-    diagnostics.apply_restitution += start.elapsed();
+        // Solve restitution for contact constraints in each color in parallel.
+        for color in constraint_graph
+            .colors
+            .iter_mut()
+            .take(COLOR_OVERFLOW_INDEX)
+            .filter(|color| !color.contact_constraints.is_empty())
+        {
+            crate::utils::par_for_each(&mut color.contact_constraints, 64, |_i, constraint| {
+                solve_restitution_internal(
+                    &bodies,
+                    constraint,
+                    threshold,
+                    solver_config.restitution_iterations,
+                );
+            });
+        }
+
+        diagnostics.apply_restitution += start.elapsed();
+    }
 }
 
 fn solve_restitution_internal(
@@ -721,38 +734,41 @@ fn solve_restitution_internal(
 /// Copies contact impulses from [`ContactConstraints`] to the contacts in the [`ContactGraph`].
 /// They will be used for [warm starting](SubstepSolverSystems::WarmStart).
 fn store_contact_impulses(
-    mut contact_graph: Single<&mut ContactGraph>,
-    mut constraint_graph: Single<&mut ConstraintGraph>,
-    mut diagnostics: Single<&mut SolverDiagnostics>,
+    mut worlds: Query<
+        (&mut ContactGraph, &mut ConstraintGraph, &mut SolverDiagnostics),
+        With<PhysicsWorld>,
+    >,
 ) {
-    let start = crate::utils::Instant::now();
+    for (mut contact_graph, mut constraint_graph, mut diagnostics) in worlds.iter_mut() {
+        let start = crate::utils::Instant::now();
 
-    for color in constraint_graph.colors.iter_mut() {
-        for constraint in &mut color.contact_constraints {
-            let Some(manifold) = contact_graph.get_manifold_mut(ContactManifoldHandle {
-                contact_id: constraint.contact_id,
-                manifold_index: constraint.manifold_index,
-            }) else {
-                unreachable!(
-                    "Contact manifold {:?} for contact ID {:?} not found in contact graph.",
-                    constraint.contact_id, constraint.manifold_index
-                );
-            };
+        for color in constraint_graph.colors.iter_mut() {
+            for constraint in &mut color.contact_constraints {
+                let Some(manifold) = contact_graph.get_manifold_mut(ContactManifoldHandle {
+                    contact_id: constraint.contact_id,
+                    manifold_index: constraint.manifold_index,
+                }) else {
+                    unreachable!(
+                        "Contact manifold {:?} for contact ID {:?} not found in contact graph.",
+                        constraint.contact_id, constraint.manifold_index
+                    );
+                };
 
-            for (contact, constraint_point) in
-                manifold.points.iter_mut().zip(constraint.points.iter())
-            {
-                contact.warm_start_normal_impulse = constraint_point.normal_part.impulse;
-                contact.warm_start_tangent_impulse = constraint_point
-                    .tangent_part
-                    .as_ref()
-                    .map_or(default(), |part| part.impulse);
-                contact.normal_impulse = constraint_point.normal_part.total_impulse;
+                for (contact, constraint_point) in
+                    manifold.points.iter_mut().zip(constraint.points.iter())
+                {
+                    contact.warm_start_normal_impulse = constraint_point.normal_part.impulse;
+                    contact.warm_start_tangent_impulse = constraint_point
+                        .tangent_part
+                        .as_ref()
+                        .map_or(default(), |part| part.impulse);
+                    contact.normal_impulse = constraint_point.normal_part.total_impulse;
+                }
             }
         }
-    }
 
-    diagnostics.store_impulses += start.elapsed();
+        diagnostics.store_impulses += start.elapsed();
+    }
 }
 
 /// Applies velocity corrections caused by joint damping.

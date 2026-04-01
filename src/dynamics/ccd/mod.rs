@@ -525,10 +525,12 @@ fn solve_swept_ccd(
     bodies: Query<SweptCcdBodyQuery>,
     colliders: Query<(&Collider, &ColliderOf)>,
     time: Res<Time>,
-    contact_graph: Single<&ContactGraph>,
-    narrow_phase_config: Single<&NarrowPhaseConfig>,
-    mut diagnostics: Single<&mut SolverDiagnostics>,
+    mut worlds: Query<(&ContactGraph, &NarrowPhaseConfig, &mut SolverDiagnostics), With<PhysicsWorld>>,
 ) {
+    // TODO: Per-world CCD iteration
+    let Ok((contact_graph, narrow_phase_config, mut diagnostics)) = worlds.single_mut() else {
+        return;
+    };
     let start = crate::utils::Instant::now();
 
     let delta_secs = time.delta_seconds_adjusted();

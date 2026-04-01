@@ -263,21 +263,22 @@ pub fn pre_process_velocity_increments(
         Option<&AngularDamping>,
         Option<&GravityScale>,
         Option<&LockedAxes>,
+        &PhysicsWorldOf,
     )>,
-    gravity: Single<&Gravity>,
+    mut worlds: Query<(Entity, &Gravity, &mut SolverDiagnostics), With<PhysicsWorld>>,
     time: Res<Time<Substeps>>,
-    mut diagnostics: Single<&mut SolverDiagnostics>,
 ) {
-    let start = crate::utils::Instant::now();
-
     let delta_secs = time.delta_secs_f64() as Scalar;
 
-    // TODO: Do we want to skip kinematic bodies here?
-    bodies.par_iter_mut().for_each(
-        |(rb, mut integration, lin_damping, ang_damping, gravity_scale, locked_axes)| {
-            if !rb.is_dynamic() {
-                // Skip non-dynamic bodies.
-                return;
+    for (world_entity, gravity, mut diagnostics) in worlds.iter_mut() {
+        let start = crate::utils::Instant::now();
+
+        // TODO: Do we want to skip kinematic bodies here?
+        for (rb, mut integration, lin_damping, ang_damping, gravity_scale, locked_axes, world_of) in
+            bodies.iter_mut()
+        {
+            if world_of.world != world_entity || !rb.is_dynamic() {
+                continue;
             }
 
             let locked_axes = locked_axes.map_or(LockedAxes::default(), |locked_axes| *locked_axes);
@@ -304,16 +305,16 @@ pub fn pre_process_velocity_increments(
             // Multiply by the time step to get the final velocity increments.
             integration.linear_increment *= delta_secs;
             integration.angular_increment *= delta_secs;
-        },
-    );
+        }
 
-    diagnostics.update_velocity_increments += start.elapsed();
+        diagnostics.update_velocity_increments += start.elapsed();
+    }
 }
 
 /// Clears the velocity increments of bodies after the substepping loop.
 fn clear_velocity_increments(
     mut bodies: Query<&mut VelocityIntegrationData, With<SolverBody>>,
-    mut diagnostics: Single<&mut SolverDiagnostics>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -322,7 +323,10 @@ fn clear_velocity_increments(
         integration.angular_increment = AngularVector::ZERO;
     });
 
-    diagnostics.update_velocity_increments += start.elapsed();
+    let elapsed = start.elapsed();
+    for mut diagnostics in worlds.iter_mut() {
+        diagnostics.update_velocity_increments += elapsed;
+    }
 }
 
 #[derive(QueryData)]
@@ -343,7 +347,7 @@ pub fn integrate_velocities(
         VelocityIntegrationQuery,
         (RigidBodyActiveFilter, Without<CustomVelocityIntegration>),
     >,
-    mut diagnostics: Single<&mut SolverDiagnostics>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
     #[cfg(feature = "3d")] time: Res<Time>,
 ) {
     let start = crate::utils::Instant::now();
@@ -385,7 +389,10 @@ pub fn integrate_velocities(
         }
     });
 
-    diagnostics.integrate_velocities += start.elapsed();
+    let elapsed = start.elapsed();
+    for mut diagnostics in worlds.iter_mut() {
+        diagnostics.integrate_velocities += elapsed;
+    }
 }
 
 /// Applies the effects of gyroscopic motion to the given angular velocity.
@@ -467,7 +474,7 @@ fn clamp_velocities(
         Query<(&mut SolverBody, &MaxLinearSpeed)>,
         Query<(&mut SolverBody, &MaxAngularSpeed)>,
     )>,
-    mut diagnostics: Single<&mut SolverDiagnostics>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -494,14 +501,17 @@ fn clamp_velocities(
         }
     });
 
-    diagnostics.integrate_velocities += start.elapsed();
+    let elapsed = start.elapsed();
+    for mut diagnostics in worlds.iter_mut() {
+        diagnostics.integrate_velocities += elapsed;
+    }
 }
 
 /// Integrates the positions of bodies based on their velocities and the time step.
 pub fn integrate_positions(
     mut solver_bodies: Query<&mut SolverBody, Without<CustomPositionIntegration>>,
     time: Res<Time>,
-    mut diagnostics: Single<&mut SolverDiagnostics>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -529,7 +539,10 @@ pub fn integrate_positions(
         }
     });
 
-    diagnostics.integrate_positions += start.elapsed();
+    let elapsed = start.elapsed();
+    for mut diagnostics in worlds.iter_mut() {
+        diagnostics.integrate_positions += elapsed;
+    }
 }
 
 #[cfg(test)]

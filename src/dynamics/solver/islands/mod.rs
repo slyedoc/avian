@@ -45,7 +45,7 @@
 pub(crate) mod sleeping;
 pub use sleeping::{IslandSleepingPlugin, SleepBody, SleepIslands, WakeBody, WakeIslands};
 
-use crate::world::MainPhysicsWorldEntity;
+use crate::world::{MainPhysicsWorldEntity, PhysicsWorld};
 use bevy::{
     ecs::{entity_disabling::Disabled, lifecycle::HookContext, world::DeferredWorld},
     prelude::*,
@@ -156,21 +156,21 @@ impl Plugin for IslandPlugin {
 }
 
 fn split_island(
-    mut islands: Single<&mut PhysicsIslands>,
+    mut worlds: Query<(&mut PhysicsIslands, &mut ContactGraph, &mut JointGraph), With<PhysicsWorld>>,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     body_colliders: Query<&RigidBodyColliders>,
-    mut contact_graph: Single<&mut ContactGraph>,
-    mut joint_graph: Single<&mut JointGraph>,
 ) {
-    // Splitting is only done when bodies want to sleep.
-    if let Some(island_id) = islands.split_candidate {
-        islands.split_island(
-            island_id,
-            &mut body_islands,
-            &body_colliders,
-            &mut contact_graph,
-            &mut joint_graph,
-        );
+    for (mut islands, mut contact_graph, mut joint_graph) in worlds.iter_mut() {
+        // Splitting is only done when bodies want to sleep.
+        if let Some(island_id) = islands.split_candidate {
+            islands.split_island(
+                island_id,
+                &mut body_islands,
+                &body_colliders,
+                &mut contact_graph,
+                &mut joint_graph,
+            );
+        }
     }
 }
 
@@ -1400,13 +1400,13 @@ impl BodyIslandNode {
                         &BodyIslandNode,
                         Or<(With<Disabled>, Without<Disabled>)>,
                     >,
-                          islands: Single<&PhysicsIslands>,
-                          contact_graph: Single<&ContactGraph>,
-                          joint_graph: Single<&JointGraph>| {
-                        let island = islands
-                            .get(island_id)
-                            .unwrap_or_else(|| panic!("Island {island_id} does not exist"));
-                        island.validate(&bodies, &contact_graph.edges, &joint_graph);
+                          worlds: Query<(&PhysicsIslands, &ContactGraph, &JointGraph), With<PhysicsWorld>>| {
+                        for (islands, contact_graph, joint_graph) in worlds.iter() {
+                            let island = islands
+                                .get(island_id)
+                                .unwrap_or_else(|| panic!("Island {island_id} does not exist"));
+                            island.validate(&bodies, &contact_graph.edges, &joint_graph);
+                        }
                     },
                 );
             });

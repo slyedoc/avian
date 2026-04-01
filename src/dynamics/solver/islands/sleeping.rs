@@ -163,7 +163,7 @@ fn wake_on_enable_rigid_body(
 pub(crate) struct AwakeIslandBitVec(pub(crate) BitVec);
 
 fn wake_islands_with_sleeping_disabled(
-    mut awake_island_bit_vec: Single<&mut AwakeIslandBitVec>,
+    mut worlds: Query<&mut AwakeIslandBitVec, With<PhysicsWorld>>,
     mut query: Query<
         (&BodyIslandNode, &mut SleepTimer),
         Or<(
@@ -173,6 +173,9 @@ fn wake_islands_with_sleeping_disabled(
         )>,
     >,
 ) {
+    let Ok(mut awake_island_bit_vec) = worlds.single_mut() else {
+        return;
+    };
     // Wake up all islands that have a body with `SleepingDisabled`.
     for (body_island, mut sleep_timer) in &mut query {
         awake_island_bit_vec.set_and_grow(body_island.island_id.0 as usize);
@@ -183,8 +186,7 @@ fn wake_islands_with_sleeping_disabled(
 }
 
 fn update_sleeping_states(
-    mut awake_island_bit_vec: Single<&mut AwakeIslandBitVec>,
-    mut islands: Single<&mut PhysicsIslands>,
+    mut worlds: Query<(&mut AwakeIslandBitVec, &mut PhysicsIslands, &PhysicsLengthUnit, &TimeToSleep), With<PhysicsWorld>>,
     mut query: Query<
         (
             &mut SleepTimer,
@@ -194,10 +196,11 @@ fn update_sleeping_states(
         ),
         (Without<Sleeping>, Without<SleepingDisabled>),
     >,
-    length_unit: Single<&PhysicsLengthUnit>,
-    time_to_sleep: Single<&TimeToSleep>,
     time: Res<Time>,
 ) {
+    let Ok((mut awake_island_bit_vec, mut islands, length_unit, time_to_sleep)) = worlds.single_mut() else {
+        return;
+    };
     let length_unit_squared = length_unit.0 * length_unit.0;
     let delta_secs = time.delta_secs();
 
@@ -242,12 +245,15 @@ fn update_sleeping_states(
 }
 
 fn sleep_islands(
-    mut awake_island_bit_vec: Single<&mut AwakeIslandBitVec>,
-    mut islands: Single<&mut PhysicsIslands>,
+    mut worlds: Query<(&mut AwakeIslandBitVec, &mut PhysicsIslands), With<PhysicsWorld>>,
     mut commands: Commands,
     mut sleep_buffer: Local<Vec<IslandId>>,
     mut wake_buffer: Local<Vec<IslandId>>,
 ) {
+    let Ok((mut awake_island_bit_vec, mut islands)) = worlds.single_mut() else {
+        return;
+    };
+
     // Clear the buffers.
     sleep_buffer.clear();
     wake_buffer.clear();
@@ -605,10 +611,13 @@ fn wake_on_changed(
         // and don't need special handling.
         Query<&BodyIslandNode, Or<(ConstantForceChanges, Changed<GravityScale>)>>,
     )>,
-    mut awake_island_bit_vec: Single<&mut AwakeIslandBitVec>,
+    mut worlds: Query<&mut AwakeIslandBitVec, With<PhysicsWorld>>,
     last_physics_tick: Res<LastPhysicsTick>,
     system_tick: SystemChangeTick,
 ) {
+    let Ok(mut awake_island_bit_vec) = worlds.single_mut() else {
+        return;
+    };
     let this_run = system_tick.this_run();
 
     for (pos, rot, lin_vel, ang_vel, sleep_timer, body_island) in &query.p0() {
@@ -628,7 +637,8 @@ fn wake_on_changed(
 }
 
 /// Wakes up all sleeping [`PhysicsIsland`](super::PhysicsIsland)s. Triggered automatically when [`Gravity`] is changed.
-fn wake_all_islands(mut commands: Commands, islands: Single<&PhysicsIslands>) {
+fn wake_all_islands(mut commands: Commands, worlds: Query<&PhysicsIslands, With<PhysicsWorld>>) {
+    for islands in worlds.iter() {
     let sleeping_islands: Vec<IslandId> = islands
         .iter()
         .filter_map(|island| island.is_sleeping.then_some(island.id))
@@ -636,5 +646,6 @@ fn wake_all_islands(mut commands: Commands, islands: Single<&PhysicsIslands>) {
 
     if !sleeping_islands.is_empty() {
         commands.queue(WakeIslands(sleeping_islands));
+    }
     }
 }

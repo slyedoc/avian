@@ -67,8 +67,11 @@ fn diagnostic_entity_counts(
     distance_joint_query: Query<&DistanceJoint>,
     revolute_joint_query: Query<&RevoluteJoint>,
     #[cfg(feature = "3d")] spherical_joint_query: Query<&SphericalJoint>,
-    mut diagnostics: Single<&mut PhysicsEntityDiagnostics>,
+    mut worlds: Query<&mut PhysicsEntityDiagnostics, With<crate::world::PhysicsWorld>>,
 ) {
+    let Ok(mut diagnostics) = worlds.single_mut() else {
+        return;
+    };
     diagnostics.dynamic_body_count = rigid_bodies_query
         .iter()
         .filter(|rb| rb.is_dynamic())

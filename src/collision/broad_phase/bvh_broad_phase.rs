@@ -49,84 +49,100 @@ where
 }
 
 fn collect_collision_pairs<H: CollisionHooks>(
-    trees: Single<&mut ColliderTrees>,
-    moved_proxies: Single<&MovedProxies>,
+    mut worlds: Query<(&mut ColliderTrees, &MovedProxies, &mut ContactGraph, &JointGraph, &mut CollisionDiagnostics), With<PhysicsWorld>>,
     hooks: StaticSystemParam<H>,
     par_commands: ParallelCommands,
-    mut contact_graph: Single<&mut ContactGraph>,
-    joint_graph: Single<&JointGraph>,
-    mut diagnostics: Single<&mut CollisionDiagnostics>,
 ) where
     for<'w, 's> SystemParamItem<'w, 's, H>: CollisionHooks,
 {
-    let start = crate::utils::Instant::now();
-
     let hooks = hooks.into_inner();
-    let mut broad_collision_pairs = Vec::<(ColliderTreeProxyKey, ColliderTreeProxyKey)>::new();
 
-    // Perform tree queries for all moving proxies.
-    // TODO. We could iterate moved proxies of each tree separately
-    //       to get rid of tree lookups and body type checks.
-    //       May not be worth it though?
-    let pairs = moved_proxies.proxies().par_splat_map(
-        ComputeTaskPool::get(),
-        None,
-        |_chunk_index, proxies| {
-            let mut pairs = Vec::new();
+    for (mut trees, moved_proxies, mut contact_graph, joint_graph, mut diagnostics) in worlds.iter_mut() {
+        let start = crate::utils::Instant::now();
 
-            par_commands.command_scope(|mut commands| {
-                for proxy_key1 in proxies {
-                    let proxy_id1 = proxy_key1.id();
-                    let proxy_type1 = proxy_key1.tree_type();
+        let mut broad_collision_pairs = Vec::<(ColliderTreeProxyKey, ColliderTreeProxyKey)>::new();
 
-                    // Get the proxy from its appropriate tree.
-                    let tree = trees.tree_for_type(proxy_type1);
-                    let proxy1 = tree.get_proxy(proxy_key1.id()).unwrap();
+        // Perform tree queries for all moving proxies.
+        // TODO. We could iterate moved proxies of each tree separately
+        //       to get rid of tree lookups and body type checks.
+        //       May not be worth it though?
+        let pairs = moved_proxies.proxies().par_splat_map(
+            ComputeTaskPool::get(),
+            None,
+            |_chunk_index, proxies| {
+                let mut pairs = Vec::new();
 
-                    let Some(proxy_aabb1) = tree.get_proxy_aabb(proxy_id1) else {
-                        continue;
-                    };
+                par_commands.command_scope(|mut commands| {
+                    for proxy_key1 in proxies {
+                        let proxy_id1 = proxy_key1.id();
+                        let proxy_type1 = proxy_key1.tree_type();
 
-                    // Query dynamic tree.
-                    query_tree(
-                        &trees.dynamic_tree,
-                        ColliderTreeType::Dynamic,
-                        *proxy_key1,
-                        proxy_id1,
-                        proxy_type1,
-                        proxy_aabb1,
-                        proxy1,
-                        &moved_proxies,
-                        &hooks,
-                        &mut commands,
-                        &contact_graph,
-                        &joint_graph,
-                        &mut pairs,
-                    );
+                        // Get the proxy from its appropriate tree.
+                        let tree = trees.tree_for_type(proxy_type1);
+                        let proxy1 = tree.get_proxy(proxy_key1.id()).unwrap();
 
-                    // Query kinematic tree.
-                    query_tree(
-                        &trees.kinematic_tree,
-                        ColliderTreeType::Kinematic,
-                        *proxy_key1,
-                        proxy_id1,
-                        proxy_type1,
-                        proxy_aabb1,
-                        proxy1,
-                        &moved_proxies,
-                        &hooks,
-                        &mut commands,
-                        &contact_graph,
-                        &joint_graph,
-                        &mut pairs,
-                    );
+                        let Some(proxy_aabb1) = tree.get_proxy_aabb(proxy_id1) else {
+                            continue;
+                        };
 
-                    // Skip static-static body collisions unless sensors or standalone colliders are involved.
-                    if proxy_type1 != ColliderTreeType::Static || proxy1.is_sensor() {
-                        // Query static tree.
+                        // Query dynamic tree.
                         query_tree(
-                            &trees.static_tree,
-                            ColliderTreeType::Static,
+                            &trees.dynamic_tree,
+                            ColliderTreeType::Dynamic,
+                            *proxy_key1,
+                            proxy_id1,
+                            proxy_type1,
+                            proxy_aabb1,
+                            proxy1,
+                            &moved_proxies,
+                            &hooks,
+                            &mut commands,
+                            &contact_graph,
+                            &joint_graph,
+                            &mut pairs,
+                        );
+
+                        // Query kinematic tree.
+                        query_tree(
+                            &trees.kinematic_tree,
+                            ColliderTreeType::Kinematic,
+                            *proxy_key1,
+                            proxy_id1,
+                            proxy_type1,
+                            proxy_aabb1,
+                            proxy1,
+                            &moved_proxies,
+                            &hooks,
+                            &mut commands,
+                            &contact_graph,
+                            &joint_graph,
+                            &mut pairs,
+                        );
+
+                        // Skip static-static body collisions unless sensors or standalone colliders are involved.
+                        if proxy_type1 != ColliderTreeType::Static || proxy1.is_sensor() {
+                            // Query static tree.
+                            query_tree(
+                                &trees.static_tree,
+                                ColliderTreeType::Static,
+                                *proxy_key1,
+                                proxy_id1,
+                                proxy_type1,
+                                proxy_aabb1,
+                                proxy1,
+                                &moved_proxies,
+                                &hooks,
+                                &mut commands,
+                                &contact_graph,
+                                &joint_graph,
+                                &mut pairs,
+                            );
+                        }
+
+                        // Query standalone tree (colliders with no body).
+                        query_tree(
+                            &trees.standalone_tree,
+                            ColliderTreeType::Standalone,
                             *proxy_key1,
                             proxy_id1,
                             proxy_type1,
@@ -140,70 +156,53 @@ fn collect_collision_pairs<H: CollisionHooks>(
                             &mut pairs,
                         );
                     }
+                });
 
-                    // Query standalone tree (colliders with no body).
-                    query_tree(
-                        &trees.standalone_tree,
-                        ColliderTreeType::Standalone,
-                        *proxy_key1,
-                        proxy_id1,
-                        proxy_type1,
-                        proxy_aabb1,
-                        proxy1,
-                        &moved_proxies,
-                        &hooks,
-                        &mut commands,
-                        &contact_graph,
-                        &joint_graph,
-                        &mut pairs,
-                    );
-                }
-            });
-
-            pairs
-        },
-    );
-
-    // Drain the pairs into a single vector.
-    for mut chunk in pairs {
-        broad_collision_pairs.append(&mut chunk);
-    }
-
-    // Add the found collision pairs to the contact graph.
-    for (proxy_key1, proxy_key2) in broad_collision_pairs {
-        let proxy1 = trees.get_proxy(proxy_key1).unwrap();
-        let proxy2 = trees.get_proxy(proxy_key2).unwrap();
-
-        let mut contact_edge = ContactEdge::new(proxy1.collider, proxy2.collider);
-        contact_edge.body1 = proxy1.body;
-        contact_edge.body2 = proxy2.body;
-
-        let flags_union = proxy1.flags.union(proxy2.flags);
-
-        // Contact event flags
-        contact_edge.flags.set(
-            ContactEdgeFlags::CONTACT_EVENTS,
-            flags_union.contains(ColliderTreeProxyFlags::CONTACT_EVENTS),
+                pairs
+            },
         );
 
-        contact_graph.add_edge_with(contact_edge, |contact_pair| {
-            contact_pair.body1 = proxy1.body;
-            contact_pair.body2 = proxy2.body;
+        // Drain the pairs into a single vector.
+        for mut chunk in pairs {
+            broad_collision_pairs.append(&mut chunk);
+        }
 
-            contact_pair.flags.set(
-                ContactPairFlags::MODIFY_CONTACTS,
-                flags_union.contains(ColliderTreeProxyFlags::MODIFY_CONTACTS),
+        // Add the found collision pairs to the contact graph.
+        for (proxy_key1, proxy_key2) in broad_collision_pairs {
+            let proxy1 = trees.get_proxy(proxy_key1).unwrap();
+            let proxy2 = trees.get_proxy(proxy_key2).unwrap();
+
+            let mut contact_edge = ContactEdge::new(proxy1.collider, proxy2.collider);
+            contact_edge.body1 = proxy1.body;
+            contact_edge.body2 = proxy2.body;
+
+            let flags_union = proxy1.flags.union(proxy2.flags);
+
+            // Contact event flags
+            contact_edge.flags.set(
+                ContactEdgeFlags::CONTACT_EVENTS,
+                flags_union.contains(ColliderTreeProxyFlags::CONTACT_EVENTS),
             );
 
-            contact_pair.flags.set(
-                ContactPairFlags::GENERATE_CONSTRAINTS,
-                !flags_union.contains(ColliderTreeProxyFlags::BODY_DISABLED)
-                    && !flags_union.contains(ColliderTreeProxyFlags::SENSOR),
-            );
-        });
+            contact_graph.add_edge_with(contact_edge, |contact_pair| {
+                contact_pair.body1 = proxy1.body;
+                contact_pair.body2 = proxy2.body;
+
+                contact_pair.flags.set(
+                    ContactPairFlags::MODIFY_CONTACTS,
+                    flags_union.contains(ColliderTreeProxyFlags::MODIFY_CONTACTS),
+                );
+
+                contact_pair.flags.set(
+                    ContactPairFlags::GENERATE_CONSTRAINTS,
+                    !flags_union.contains(ColliderTreeProxyFlags::BODY_DISABLED)
+                        && !flags_union.contains(ColliderTreeProxyFlags::SENSOR),
+                );
+            });
+        }
+
+        diagnostics.broad_phase += start.elapsed();
     }
-
-    diagnostics.broad_phase += start.elapsed();
 }
 
 #[inline]

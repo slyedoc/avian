@@ -257,7 +257,7 @@ fn update_narrow_phase<C: AnyCollider, H: CollisionHooks + 'static>(
     hooks: StaticSystemParam<H>,
     context: StaticSystemParam<C::Context>,
     mut commands: ParallelCommands,
-    mut diagnostics: Single<&mut CollisionDiagnostics>,
+    mut world_diagnostics: Query<&mut CollisionDiagnostics, With<PhysicsWorld>>,
 ) where
     for<'w, 's> SystemParamItem<'w, 's, H>: CollisionHooks,
 {
@@ -272,8 +272,12 @@ fn update_narrow_phase<C: AnyCollider, H: CollisionHooks + 'static>(
         &mut commands,
     );
 
-    diagnostics.narrow_phase = start.elapsed();
-    diagnostics.contact_count = narrow_phase.contact_graph.edges.edge_count() as u32;
+    let elapsed = start.elapsed();
+    let contact_count = narrow_phase.contact_graph.edges.edge_count() as u32;
+    for mut diagnostics in world_diagnostics.iter_mut() {
+        diagnostics.narrow_phase = elapsed;
+        diagnostics.contact_count = contact_count;
+    }
 }
 
 #[derive(SystemParam)]
@@ -449,10 +453,7 @@ fn remove_body_on<E: EntityEvent, B: Bundle>(
     >,
     mut message_writer: MessageWriter<CollisionEnd>,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
-    mut islands: Query<&mut PhysicsIslands>,
-    mut constraint_graph: Single<&mut ConstraintGraph>,
-    mut contact_graph: Single<&mut ContactGraph>,
-    joint_graph: Single<&mut JointGraph>,
+    mut worlds: Query<(&mut ConstraintGraph, &mut ContactGraph, &mut JointGraph, &mut PhysicsIslands), With<PhysicsWorld>>,
     mut commands: Commands,
 ) {
     let Ok(colliders) = body_collider_query.get(trigger.event_target()) else {
@@ -464,6 +465,10 @@ fn remove_body_on<E: EntityEvent, B: Bundle>(
         commands.queue(WakeIslands(vec![body_island.island_id]));
     }
 
+    let Ok((mut constraint_graph, mut contact_graph, joint_graph, mut islands)) = worlds.single_mut() else {
+        return;
+    };
+
     // TODO: Only remove static-static contacts and unlink from islands.
     for collider in colliders {
         remove_collider(
@@ -471,7 +476,7 @@ fn remove_body_on<E: EntityEvent, B: Bundle>(
             &mut contact_graph,
             &joint_graph,
             &mut constraint_graph,
-            islands.single_mut().ok().as_deref_mut(),
+            Some(&mut *islands),
             &mut body_islands,
             &mut colliding_entities_query,
             &mut message_writer,
@@ -485,10 +490,7 @@ fn remove_body_on<E: EntityEvent, B: Bundle>(
 /// wakes up the other body, and writes a [`CollisionEnd`] event.
 fn remove_collider_on<E: EntityEvent, B: Bundle>(
     trigger: On<E, B>,
-    mut contact_graph: Single<&mut ContactGraph>,
-    joint_graph: Single<&mut JointGraph>,
-    mut constraint_graph: Single<&mut ConstraintGraph>,
-    mut islands: Query<&mut PhysicsIslands>,
+    mut worlds: Query<(&mut ContactGraph, &mut JointGraph, &mut ConstraintGraph, &mut PhysicsIslands), With<PhysicsWorld>>,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     // TODO: Change this hack to include disabled entities with `Allows<T>` for 0.17
     mut query: Query<&mut CollidingEntities, Or<(With<Disabled>, Without<Disabled>)>>,
@@ -510,13 +512,17 @@ fn remove_collider_on<E: EntityEvent, B: Bundle>(
         commands.queue(WakeIslands(vec![body_island.island_id]));
     }
 
+    let Ok((mut contact_graph, joint_graph, mut constraint_graph, mut islands)) = worlds.single_mut() else {
+        return;
+    };
+
     // Remove the collider from the contact graph.
     remove_collider(
         entity,
         &mut contact_graph,
         &joint_graph,
         &mut constraint_graph,
-        islands.single_mut().ok().as_deref_mut(),
+        Some(&mut *islands),
         &mut body_islands,
         &mut query,
         &mut message_writer,
@@ -528,10 +534,7 @@ fn remove_collider_on<E: EntityEvent, B: Bundle>(
 fn on_body_remove_rigid_body_disabled(
     trigger: On<Add, BodyIslandNode>,
     body_collider_query: Query<&RigidBodyColliders>,
-    mut constraint_graph: Single<&mut ConstraintGraph>,
-    mut contact_graph: Single<&mut ContactGraph>,
-    joint_graph: Single<&mut JointGraph>,
-    mut islands: Query<&mut PhysicsIslands>,
+    mut worlds: Query<(&mut ConstraintGraph, &mut ContactGraph, &mut JointGraph, &mut PhysicsIslands), With<PhysicsWorld>>,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     mut colliding_entities_query: Query<
         &mut CollidingEntities,
@@ -543,13 +546,17 @@ fn on_body_remove_rigid_body_disabled(
         return;
     };
 
+    let Ok((mut constraint_graph, mut contact_graph, joint_graph, mut islands)) = worlds.single_mut() else {
+        return;
+    };
+
     for collider in colliders {
         remove_collider(
             collider,
             &mut contact_graph,
             &joint_graph,
             &mut constraint_graph,
-            islands.single_mut().ok().as_deref_mut(),
+            Some(&mut *islands),
             &mut body_islands,
             &mut colliding_entities_query,
             &mut message_writer,
@@ -562,10 +569,7 @@ fn on_body_remove_rigid_body_disabled(
 fn on_disable_body(
     trigger: On<Add, (Disabled, RigidBodyDisabled)>,
     body_collider_query: Query<&RigidBodyColliders, Or<(With<Disabled>, Without<Disabled>)>>,
-    mut constraint_graph: Single<&mut ConstraintGraph>,
-    mut contact_graph: Single<&mut ContactGraph>,
-    joint_graph: Single<&JointGraph>,
-    mut islands: Query<&mut PhysicsIslands>,
+    mut worlds: Query<(&mut ConstraintGraph, &mut ContactGraph, &JointGraph, &mut PhysicsIslands), With<PhysicsWorld>>,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     mut colliding_entities_query: Query<
         &mut CollidingEntities,
@@ -577,13 +581,17 @@ fn on_disable_body(
         return;
     };
 
+    let Ok((mut constraint_graph, mut contact_graph, joint_graph, mut islands)) = worlds.single_mut() else {
+        return;
+    };
+
     for collider in colliders {
         remove_collider(
             collider,
             &mut contact_graph,
             &joint_graph,
             &mut constraint_graph,
-            islands.single_mut().ok().as_deref_mut(),
+            Some(&mut *islands),
             &mut body_islands,
             &mut colliding_entities_query,
             &mut message_writer,
@@ -598,10 +606,7 @@ fn on_disable_body(
 /// when a collider becomes a [`Sensor`].
 fn on_add_sensor(
     trigger: On<Add, Sensor>,
-    mut constraint_graph: Single<&mut ConstraintGraph>,
-    mut contact_graph: Single<&mut ContactGraph>,
-    joint_graph: Single<&JointGraph>,
-    mut islands: Query<&mut PhysicsIslands>,
+    mut worlds: Query<(&mut ConstraintGraph, &mut ContactGraph, &JointGraph, &mut PhysicsIslands), With<PhysicsWorld>>,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     mut colliding_entities_query: Query<
         &mut CollidingEntities,
@@ -609,12 +614,15 @@ fn on_add_sensor(
     >,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {
+    let Ok((mut constraint_graph, mut contact_graph, joint_graph, mut islands)) = worlds.single_mut() else {
+        return;
+    };
     remove_collider(
         trigger.entity,
         &mut contact_graph,
         &joint_graph,
         &mut constraint_graph,
-        islands.single_mut().ok().as_deref_mut(),
+        Some(&mut *islands),
         &mut body_islands,
         &mut colliding_entities_query,
         &mut message_writer,
@@ -625,10 +633,7 @@ fn on_add_sensor(
 /// when a collider stops being a [`Sensor`].
 fn on_remove_sensor(
     trigger: On<Remove, Sensor>,
-    mut constraint_graph: Single<&mut ConstraintGraph>,
-    mut contact_graph: Single<&mut ContactGraph>,
-    joint_graph: Single<&mut JointGraph>,
-    mut islands: Query<&mut PhysicsIslands>,
+    mut worlds: Query<(&mut ConstraintGraph, &mut ContactGraph, &mut JointGraph, &mut PhysicsIslands), With<PhysicsWorld>>,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     mut colliding_entities_query: Query<
         &mut CollidingEntities,
@@ -636,12 +641,15 @@ fn on_remove_sensor(
     >,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {
+    let Ok((mut constraint_graph, mut contact_graph, joint_graph, mut islands)) = worlds.single_mut() else {
+        return;
+    };
     remove_collider(
         trigger.entity,
         &mut contact_graph,
         &joint_graph,
         &mut constraint_graph,
-        islands.single_mut().ok().as_deref_mut(),
+        Some(&mut *islands),
         &mut body_islands,
         &mut colliding_entities_query,
         &mut message_writer,

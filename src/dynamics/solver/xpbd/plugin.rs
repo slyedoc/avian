@@ -214,10 +214,13 @@ pub fn warm_start_xpbd_motors<
     bodies: Query<(&mut SolverBody, &SolverBodyInertia), Without<RigidBodyDisabled>>,
     mut joints: Query<(&C, &mut C::SolverData), (Without<RigidBody>, Without<JointDisabled>)>,
     time: Res<Time>,
-    solver_config: Single<&SolverConfig>,
+    worlds: Query<&SolverConfig, With<PhysicsWorld>>,
 ) where
     C::SolverData: Component<Mutability = Mutable>,
 {
+    let Ok(solver_config) = worlds.single() else {
+        return;
+    };
     let delta_secs = time.delta_seconds_adjusted();
 
     let mut dummy_body1 = SolverBody::default();
@@ -309,10 +312,13 @@ fn project_angular_velocity(
 fn writeback_joint_forces<C: Component + EntityConstraint<2> + XpbdConstraint<2>>(
     mut joints: Query<(&C::SolverData, &mut JointForces)>,
     time: Res<Time>,
-    substep_count: Single<&SubstepCount>,
+    worlds: Query<&SubstepCount, With<PhysicsWorld>>,
 ) where
     C::SolverData: Component<Mutability = Mutable>,
 {
+    let Ok(substep_count) = worlds.single() else {
+        return;
+    };
     let delta_secs = time.delta_seconds_adjusted();
 
     // Detailed Rigid Body Simulation with Extended Position Based Dynamics by Müller et al.

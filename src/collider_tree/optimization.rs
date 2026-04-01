@@ -166,11 +166,12 @@ pub(crate) struct OptimizationTasks(Vec<Task<CommandQueue>>);
 /// that runs concurrently with the simulation step. Otherwise, the optimization is performed
 /// in-place on the main thread.
 fn optimize_trees(
-    mut collider_trees: Single<&mut ColliderTrees>,
-    mut optimization_tasks: Single<&mut OptimizationTasks>,
-    optimization_settings: Single<&ColliderTreeOptimization>,
-    mut diagnostics: Single<&mut ColliderTreeDiagnostics>,
+    mut worlds: Query<
+        (&mut ColliderTrees, &mut OptimizationTasks, &ColliderTreeOptimization, &mut ColliderTreeDiagnostics),
+        With<PhysicsWorld>,
+    >,
 ) {
+    for (mut collider_trees, mut optimization_tasks, optimization_settings, mut diagnostics) in worlds.iter_mut() {
     let start = crate::utils::Instant::now();
 
     let task_pool = AsyncComputeTaskPool::get();
@@ -228,6 +229,7 @@ fn optimize_trees(
     }
 
     diagnostics.optimize += start.elapsed();
+    }
 }
 
 fn optimize_tree_in_place(tree: &mut ColliderTree, optimization_strategy: TreeOptimizationMode) {
@@ -288,16 +290,17 @@ fn spawn_optimization_task(
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "unknown")))]
 fn block_on_optimize_trees(
     mut commands: Commands,
-    mut optimization: Single<&mut OptimizationTasks>,
-    mut diagnostics: Single<&mut ColliderTreeDiagnostics>,
+    mut worlds: Query<(&mut OptimizationTasks, &mut ColliderTreeDiagnostics), With<PhysicsWorld>>,
 ) {
-    let start = crate::utils::Instant::now();
+    for (mut optimization, mut diagnostics) in worlds.iter_mut() {
+        let start = crate::utils::Instant::now();
 
-    // Complete all ongoing optimization tasks.
-    optimization.drain(..).for_each(|task| {
-        let mut command_queue = block_on(task);
-        commands.append(&mut command_queue);
-    });
+        // Complete all ongoing optimization tasks.
+        optimization.drain(..).for_each(|task| {
+            let mut command_queue = block_on(task);
+            commands.append(&mut command_queue);
+        });
 
-    diagnostics.optimize += start.elapsed();
+        diagnostics.optimize += start.elapsed();
+    }
 }

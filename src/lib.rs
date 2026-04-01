@@ -557,7 +557,10 @@ pub mod prelude {
             PhysicsStepSystems, PhysicsSystems, PhysicsTime, Substeps,
         },
         spatial_query::{self, *},
-        world::{MainPhysicsWorld, MainPhysicsWorldEntity, PhysicsWorld, PhysicsWorldPlugin},
+        world::{
+            MainPhysicsWorld, MainPhysicsWorldEntity, PhysicsWorld, PhysicsWorldMembers,
+            PhysicsWorldOf, PhysicsWorldPlugin,
+        },
     };
 
     #[cfg(all(
