@@ -214,7 +214,7 @@ pub fn warm_start_xpbd_motors<
     bodies: Query<(&mut SolverBody, &SolverBodyInertia), Without<RigidBodyDisabled>>,
     mut joints: Query<(&C, &mut C::SolverData), (Without<RigidBody>, Without<JointDisabled>)>,
     time: Res<Time>,
-    solver_config: Res<SolverConfig>,
+    solver_config: Single<&SolverConfig>,
 ) where
     C::SolverData: Component<Mutability = Mutable>,
 {
@@ -309,7 +309,7 @@ fn project_angular_velocity(
 fn writeback_joint_forces<C: Component + EntityConstraint<2> + XpbdConstraint<2>>(
     mut joints: Query<(&C::SolverData, &mut JointForces)>,
     time: Res<Time>,
-    substep_count: Res<SubstepCount>,
+    substep_count: Single<&SubstepCount>,
 ) where
     C::SolverData: Component<Mutability = Mutable>,
 {

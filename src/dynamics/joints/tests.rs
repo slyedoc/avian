@@ -8,6 +8,15 @@ use crate::prelude::*;
 
 const TIMESTEP: f32 = 1.0 / 64.0;
 
+fn set_component<T: Component>(app: &mut App, value: T) {
+    let world = app.world_mut();
+    let entity = world
+        .query_filtered::<Entity, With<T>>()
+        .single(world)
+        .unwrap();
+    world.entity_mut(entity).insert(value);
+}
+
 fn create_app() -> App {
     let mut app = App::new();
     app.add_plugins((
@@ -21,9 +30,9 @@ fn create_app() -> App {
         MeshPlugin,
     ));
 
-    app.insert_resource(SubstepCount(20));
+    set_component(&mut app, SubstepCount(20));
 
-    app.insert_resource(Gravity(Vector::ZERO));
+    set_component(&mut app, Gravity(Vector::ZERO));
 
     app.insert_resource(Time::<Fixed>::from_duration(Duration::from_secs_f32(
         TIMESTEP,

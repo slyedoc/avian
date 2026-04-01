@@ -43,8 +43,8 @@ impl Plugin for PhysicsTotalDiagnosticsPlugin {
 }
 
 /// Diagnostics for total physics timers and counters.
-#[derive(Resource, Debug, Default, Reflect)]
-#[reflect(Resource, Debug)]
+#[derive(Component, Debug, Default, Reflect)]
+#[reflect(Component, Debug)]
 pub struct PhysicsTotalDiagnostics {
     /// The current physics step number.
     pub step_number: u32,
@@ -74,7 +74,7 @@ impl_diagnostic_paths! {
 }
 
 fn increment_physics_step_number(
-    mut diagnostics: ResMut<PhysicsTotalDiagnostics>,
+    mut diagnostics: Single<&mut PhysicsTotalDiagnostics>,
     mut step: Local<u32>,
 ) {
     *step += 1;
@@ -92,7 +92,7 @@ fn update_physics_step_start(mut start: ResMut<PhysicsStepStart>) {
 
 fn update_step_time(
     start: Res<PhysicsStepStart>,
-    mut diagnostics: ResMut<PhysicsTotalDiagnostics>,
+    mut diagnostics: Single<&mut PhysicsTotalDiagnostics>,
 ) {
     diagnostics.step_time = start.0.elapsed();
 }

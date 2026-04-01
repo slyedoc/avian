@@ -523,6 +523,8 @@ pub mod picking;
 pub mod schedule;
 pub mod spatial_query;
 
+pub mod world;
+
 pub mod data_structures;
 
 // TODO: Where should this go?
@@ -555,6 +557,7 @@ pub mod prelude {
             PhysicsStepSystems, PhysicsSystems, PhysicsTime, Substeps,
         },
         spatial_query::{self, *},
+        world::{MainPhysicsWorld, MainPhysicsWorldEntity, PhysicsWorld, PhysicsWorldPlugin},
     };
 
     #[cfg(all(
@@ -756,6 +759,7 @@ impl Default for PhysicsPlugins {
 impl PluginGroup for PhysicsPlugins {
     fn build(self) -> PluginGroupBuilder {
         let builder = PluginGroupBuilder::start::<Self>()
+            .add(PhysicsWorldPlugin)
             .add(PhysicsSchedulePlugin::new(self.schedule))
             .add(MassPropertyPlugin::new(self.schedule))
             .add(ForcePlugin)

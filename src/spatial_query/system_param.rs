@@ -60,7 +60,7 @@ use parry::query::ShapeCastOptions;
 pub struct SpatialQuery<'w, 's> {
     colliders: Query<'w, 's, (&'static Position, &'static Rotation, &'static Collider)>,
     aabbs: Query<'w, 's, &'static ColliderAabb>,
-    collider_trees: Res<'w, ColliderTrees>,
+    collider_trees: Single<'w, 's, &'static ColliderTrees>,
 }
 
 impl SpatialQuery<'_, '_> {

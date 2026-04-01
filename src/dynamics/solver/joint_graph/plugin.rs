@@ -62,7 +62,7 @@ impl<T: Component + EntityConstraint<2>> Plugin for JointGraphPlugin<T> {
             .world()
             .is_resource_added::<JointGraphPluginInitialized>();
 
-        app.init_resource::<JointGraph>();
+        // JointGraph is on the PhysicsWorld entity.
         app.init_resource::<JointGraphPluginInitialized>();
 
         // Automatically add the `JointComponentId` component when the joint is added.
@@ -126,9 +126,9 @@ fn add_joint_to_graph<
     query: Query<(&T, Has<JointCollisionDisabled>), F>,
     mut commands: Commands,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
-    mut contact_graph: ResMut<ContactGraph>,
-    mut joint_graph: ResMut<JointGraph>,
-    mut islands: Option<ResMut<PhysicsIslands>>,
+    mut contact_graph: Single<&mut ContactGraph>,
+    mut joint_graph: Single<&mut JointGraph>,
+    mut islands: Query<&mut PhysicsIslands>,
 ) {
     let entity = trigger.event_target();
 
@@ -143,7 +143,7 @@ fn add_joint_to_graph<
     let joint_id = joint_graph.add_joint(body1, body2, joint_edge);
 
     // Link the joint to an island.
-    if let Some(islands) = &mut islands {
+    if let Ok(mut islands) = islands.single_mut() {
         let island = islands.add_joint(
             joint_id,
             &mut body_islands,
@@ -164,9 +164,9 @@ fn remove_joint_from_graph<E: EntityEvent, B: Bundle>(
     trigger: On<E, B>,
     mut commands: Commands,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
-    contact_graph: ResMut<ContactGraph>,
-    mut joint_graph: ResMut<JointGraph>,
-    mut islands: Option<ResMut<PhysicsIslands>>,
+    contact_graph: Single<&mut ContactGraph>,
+    mut joint_graph: Single<&mut JointGraph>,
+    mut islands: Query<&mut PhysicsIslands>,
 ) {
     let entity = trigger.event_target();
 
@@ -175,7 +175,7 @@ fn remove_joint_from_graph<E: EntityEvent, B: Bundle>(
     };
 
     // Remove the joint from the island.
-    if let Some(islands) = &mut islands
+    if let Ok(mut islands) = islands.single_mut()
         && let Some(island) = islands.remove_joint(
             joint.id,
             &mut body_islands,
@@ -247,9 +247,9 @@ fn on_remove_joint(mut world: DeferredWorld, ctx: HookContext) {
 fn on_disable_joint_collision(
     trigger: On<Add, JointCollisionDisabled>,
     query: Query<&RigidBodyColliders>,
-    joint_graph: Res<JointGraph>,
-    mut contact_graph: ResMut<ContactGraph>,
-    mut constraint_graph: ResMut<ConstraintGraph>,
+    joint_graph: Single<&JointGraph>,
+    mut contact_graph: Single<&mut ContactGraph>,
+    mut constraint_graph: Single<&mut ConstraintGraph>,
 ) {
     let entity = trigger.entity;
 
@@ -300,9 +300,9 @@ fn on_change_joint_entities<T: Component + EntityConstraint<2>>(
     query: Query<(Entity, &T), Changed<T>>,
     mut commands: Commands,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
-    mut joint_graph: ResMut<JointGraph>,
-    mut contact_graph: ResMut<ContactGraph>,
-    mut islands: Option<ResMut<PhysicsIslands>>,
+    mut joint_graph: Single<&mut JointGraph>,
+    mut contact_graph: Single<&mut ContactGraph>,
+    mut islands: Query<&mut PhysicsIslands>,
 ) {
     let mut islands_to_wake: Vec<IslandId> = Vec::new();
 
@@ -314,7 +314,7 @@ fn on_change_joint_entities<T: Component + EntityConstraint<2>>(
 
         if body1 != old_edge.body1 || body2 != old_edge.body2 {
             // Remove the joint from the island.
-            if let Some(islands) = &mut islands
+            if let Ok(mut islands) = islands.single_mut()
                 && let Some(island) = islands.remove_joint(
                     old_edge.id,
                     &mut body_islands,
@@ -338,7 +338,7 @@ fn on_change_joint_entities<T: Component + EntityConstraint<2>>(
                 let joint_id = joint_graph.add_joint(body1, body2, edge);
 
                 // Link the joint to an island.
-                if let Some(islands) = &mut islands {
+                if let Ok(mut islands) = islands.single_mut() {
                     islands.add_joint(
                         joint_id,
                         &mut body_islands,

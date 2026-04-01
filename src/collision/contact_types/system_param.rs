@@ -50,12 +50,12 @@ use super::{ContactGraph, ContactPair};
 ///
 /// [`CollisionHooks`]: crate::collision::hooks::CollisionHooks
 #[derive(SystemParam)]
-pub struct Collisions<'w> {
+pub struct Collisions<'w, 's> {
     /// The [`ContactGraph`] that stores all contact edges.
-    contact_graph: ResMut<'w, ContactGraph>,
+    contact_graph: Single<'w, 's, &'static mut ContactGraph>,
 }
 
-impl Collisions<'_> {
+impl Collisions<'_, '_> {
     /// Returns a reference to the internal [`ContactGraph`].
     ///
     /// Note that unlike [`Collisions`], which only provides touching contacts,

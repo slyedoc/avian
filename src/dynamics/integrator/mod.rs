@@ -47,8 +47,6 @@ impl Plugin for IntegratorPlugin {
         // Add `VelocityIntegrationData` to all `SolverBody`s.
         app.register_required_components::<SolverBody, VelocityIntegrationData>();
 
-        app.init_resource::<Gravity>();
-
         app.configure_sets(
             PhysicsSchedule,
             (
@@ -114,7 +112,7 @@ pub enum IntegrationSystems {
 #[deprecated(since = "0.4.0", note = "Renamed to `IntegrationSystems`")]
 pub type IntegrationSet = IntegrationSystems;
 
-/// A resource for the global gravitational acceleration.
+/// A component for the gravitational acceleration.
 ///
 /// The default is an acceleration of 9.81 m/s^2 pointing down, which is approximate to the gravitational
 /// acceleration near Earth's surface. Note that if you are using pixels as length units in 2D,
@@ -149,10 +147,10 @@ pub type IntegrationSet = IntegrationSystems;
 /// ```
 ///
 /// You can also modify gravity while the app is running.
-#[derive(Reflect, Resource, Debug)]
+#[derive(Reflect, Component, Debug)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, Resource)]
+#[reflect(Debug, Component)]
 pub struct Gravity(pub Vector);
 
 impl Default for Gravity {
@@ -266,9 +264,9 @@ pub fn pre_process_velocity_increments(
         Option<&GravityScale>,
         Option<&LockedAxes>,
     )>,
-    gravity: Res<Gravity>,
+    gravity: Single<&Gravity>,
     time: Res<Time<Substeps>>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut diagnostics: Single<&mut SolverDiagnostics>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -315,7 +313,7 @@ pub fn pre_process_velocity_increments(
 /// Clears the velocity increments of bodies after the substepping loop.
 fn clear_velocity_increments(
     mut bodies: Query<&mut VelocityIntegrationData, With<SolverBody>>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut diagnostics: Single<&mut SolverDiagnostics>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -345,7 +343,7 @@ pub fn integrate_velocities(
         VelocityIntegrationQuery,
         (RigidBodyActiveFilter, Without<CustomVelocityIntegration>),
     >,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut diagnostics: Single<&mut SolverDiagnostics>,
     #[cfg(feature = "3d")] time: Res<Time>,
 ) {
     let start = crate::utils::Instant::now();
@@ -469,7 +467,7 @@ fn clamp_velocities(
         Query<(&mut SolverBody, &MaxLinearSpeed)>,
         Query<(&mut SolverBody, &MaxAngularSpeed)>,
     )>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut diagnostics: Single<&mut SolverDiagnostics>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -503,7 +501,7 @@ fn clamp_velocities(
 pub fn integrate_positions(
     mut solver_bodies: Query<&mut SolverBody, Without<CustomPositionIntegration>>,
     time: Res<Time>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut diagnostics: Single<&mut SolverDiagnostics>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -543,6 +541,15 @@ mod tests {
     use crate::prelude::*;
     use bevy::{mesh::MeshPlugin, prelude::*, time::TimeUpdateStrategy};
 
+    fn set_component<T: Component>(app: &mut App, value: T) {
+        let world = app.world_mut();
+        let entity = world
+            .query_filtered::<Entity, With<T>>()
+            .single(world)
+            .unwrap();
+        world.entity_mut(entity).insert(value);
+    }
+
     fn create_app() -> App {
         let mut app = App::new();
         app.add_plugins((
@@ -561,7 +568,7 @@ mod tests {
     #[test]
     fn semi_implicit_euler() {
         let mut app = create_app();
-        app.insert_resource(SubstepCount(1));
+        set_component(&mut app, SubstepCount(1));
         app.finish();
 
         let body_entity = app

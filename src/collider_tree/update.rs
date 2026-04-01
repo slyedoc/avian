@@ -47,9 +47,7 @@ impl<C: AnyCollider> Default for ColliderTreeUpdatePlugin<C> {
 impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
     fn build(&self, app: &mut App) {
         // Initialize resources.
-        app.init_resource::<MovedProxies>()
-            .init_resource::<EnlargedProxies>()
-            .init_resource::<LastDynamicKinematicAabbUpdate>();
+        // MovedProxies, EnlargedProxies, and LastDynamicKinematicAabbUpdate are on the PhysicsWorld entity.
 
         // Add systems for updating collider AABBs before physics step.
         // This accounts for manually moved colliders.
@@ -82,8 +80,8 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
                 &mut ColliderAabb,
                 &mut EnlargedAabb,
             )>,
-             narrow_phase_config: Res<NarrowPhaseConfig>,
-             length_unit: Res<PhysicsLengthUnit>,
+             narrow_phase_config: Single<&NarrowPhaseConfig>,
+             length_unit: Single<&PhysicsLengthUnit>,
              collider_context: StaticSystemParam<C::Context>| {
                 let contact_tolerance = length_unit.0 * narrow_phase_config.contact_tolerance;
                 let margin = length_unit.0 * AABB_MARGIN;
@@ -144,8 +142,8 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
                 ),
                 (With<C>, Without<ColliderDisabled>),
             >,
-             mut trees: ResMut<ColliderTrees>,
-             mut moved_proxies: ResMut<MovedProxies>| {
+             mut trees: Single<&mut ColliderTrees>,
+             mut moved_proxies: Single<&mut MovedProxies>| {
                 let entity = trigger.entity;
 
                 let Ok((
@@ -218,8 +216,8 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
                 ),
                 Without<ColliderDisabled>,
             >,
-             mut trees: ResMut<ColliderTrees>,
-             mut moved_proxies: ResMut<MovedProxies>| {
+             mut trees: Single<&mut ColliderTrees>,
+             mut moved_proxies: Single<&mut MovedProxies>| {
                 let entity = trigger.entity;
 
                 let Ok((new_rb, body_colliders, is_body_disabled)) = body_query.get(entity) else {
@@ -283,7 +281,7 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
         app.add_observer(
             |trigger: On<Add, Sensor>,
              mut collider_query: Query<&ColliderTreeProxyKey, Without<ColliderDisabled>>,
-             mut trees: ResMut<ColliderTrees>| {
+             mut trees: Single<&mut ColliderTrees>| {
                 let entity = trigger.entity;
 
                 let Ok(proxy_key) = collider_query.get_mut(entity) else {
@@ -303,7 +301,7 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
         app.add_observer(
             |trigger: On<Remove, Sensor>,
              mut collider_query: Query<&ColliderTreeProxyKey, Without<ColliderDisabled>>,
-             mut trees: ResMut<ColliderTrees>| {
+             mut trees: Single<&mut ColliderTrees>| {
                 let entity = trigger.entity;
 
                 let Ok(proxy_key) = collider_query.get_mut(entity) else {
@@ -326,7 +324,7 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
                 (&ColliderTreeProxyKey, Option<&CollisionLayers>),
                 Without<ColliderDisabled>,
             >,
-             mut trees: ResMut<ColliderTrees>| {
+             mut trees: Single<&mut ColliderTrees>| {
                 let entity = trigger.entity;
 
                 let Ok((proxy_key, layers)) = collider_query.get_mut(entity) else {
@@ -349,7 +347,7 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
                 (&ColliderTreeProxyKey, Option<&ActiveCollisionHooks>),
                 Without<ColliderDisabled>,
             >,
-             mut trees: ResMut<ColliderTrees>| {
+             mut trees: Single<&mut ColliderTrees>| {
                 let entity = trigger.entity;
 
                 let Ok((proxy_key, active_hooks)) = collider_query.get_mut(entity) else {
@@ -374,7 +372,7 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
             |trigger: On<Discard, RigidBodyDisabled>,
              body_query: Query<(&RigidBodyColliders, Has<RigidBodyDisabled>)>,
              mut collider_query: Query<&ColliderTreeProxyKey, Without<ColliderDisabled>>,
-             mut trees: ResMut<ColliderTrees>| {
+             mut trees: Single<&mut ColliderTrees>| {
                 let entity = trigger.entity;
 
                 let Ok((body_colliders, is_body_disabled)) = body_query.get(entity) else {
@@ -416,8 +414,8 @@ fn add_to_tree_on<E: EntityEvent, B: Bundle, F: QueryFilter>(
         ),
         F,
     >,
-    mut trees: ResMut<ColliderTrees>,
-    mut moved_proxies: ResMut<MovedProxies>,
+    mut trees: Single<&mut ColliderTrees>,
+    mut moved_proxies: Single<&mut MovedProxies>,
 ) {
     let entity = trigger.event_target();
 
@@ -476,8 +474,8 @@ fn add_to_tree_on<E: EntityEvent, B: Bundle, F: QueryFilter>(
 fn remove_from_tree_on<E: EntityEvent, B: Bundle, F: QueryFilter>(
     trigger: On<E, B>,
     mut collider_query: Query<&mut ColliderTreeProxyKey, F>,
-    mut trees: ResMut<ColliderTrees>,
-    mut moved_proxies: ResMut<MovedProxies>,
+    mut trees: Single<&mut ColliderTrees>,
+    mut moved_proxies: Single<&mut MovedProxies>,
 ) {
     let entity = trigger.event_target();
 
@@ -500,8 +498,8 @@ fn remove_from_tree_on<E: EntityEvent, B: Bundle, F: QueryFilter>(
 
 /// A resource for tracking the last system change tick
 /// when dynamic or kinematic collider AABBs were updated.
-#[derive(Resource, Default)]
-struct LastDynamicKinematicAabbUpdate(Tick);
+#[derive(Component, Default)]
+pub(crate) struct LastDynamicKinematicAabbUpdate(Tick);
 
 /// A resource for tracking moved proxies.
 ///
@@ -509,7 +507,7 @@ struct LastDynamicKinematicAabbUpdate(Tick);
 /// previous [`EnlargedAabb`], or whose collider has been added to a [`ColliderTree`].
 ///
 /// [`ColliderTree`]: crate::collider_tree::ColliderTree
-#[derive(Resource, Default)]
+#[derive(Component, Default)]
 pub struct MovedProxies {
     /// A vector of moved proxy keys.
     proxies: Vec<ColliderTreeProxyKey>,
@@ -570,7 +568,7 @@ impl MovedProxies {
 /// [`ColliderAabb`] has moved outside of the previous [`EnlargedAabb`].
 ///
 /// Set bits indicate [`ProxyId`]s of moved proxies.
-#[derive(Resource, Default)]
+#[derive(Component, Default)]
 pub struct EnlargedProxies {
     // Note: Box2D indexes by shape ID, so it only needs one bit vector.
     //       In our case, we would instead index by entity ID, but this would
@@ -678,15 +676,15 @@ fn update_solver_body_aabbs<C: AnyCollider>(
         >,
         Query<&EnlargedAabb, Without<ColliderDisabled>>,
     )>,
-    narrow_phase_config: Res<NarrowPhaseConfig>,
-    length_unit: Res<PhysicsLengthUnit>,
-    mut trees: ResMut<ColliderTrees>,
-    mut moved_proxies: ResMut<MovedProxies>,
-    mut enlarged_proxies: ResMut<EnlargedProxies>,
+    narrow_phase_config: Single<&NarrowPhaseConfig>,
+    length_unit: Single<&PhysicsLengthUnit>,
+    mut trees: Single<&mut ColliderTrees>,
+    mut moved_proxies: Single<&mut MovedProxies>,
+    mut enlarged_proxies: Single<&mut EnlargedProxies>,
     time: Res<Time>,
     collider_context: StaticSystemParam<C::Context>,
-    mut diagnostics: ResMut<ColliderTreeDiagnostics>,
-    mut last_tick: ResMut<LastDynamicKinematicAabbUpdate>,
+    mut diagnostics: Single<&mut ColliderTreeDiagnostics>,
+    mut last_tick: Single<&mut LastDynamicKinematicAabbUpdate>,
     system_tick: SystemChangeTick,
 ) {
     let start = crate::utils::Instant::now();
@@ -853,13 +851,13 @@ pub fn update_moved_collider_aabbs<C: AnyCollider>(
         >,
         Query<&EnlargedAabb, Without<ColliderDisabled>>,
     )>,
-    narrow_phase_config: Res<NarrowPhaseConfig>,
-    length_unit: Res<PhysicsLengthUnit>,
-    mut trees: ResMut<ColliderTrees>,
-    mut moved_proxies: ResMut<MovedProxies>,
-    mut enlarged_proxies: ResMut<EnlargedProxies>,
+    narrow_phase_config: Single<&NarrowPhaseConfig>,
+    length_unit: Single<&PhysicsLengthUnit>,
+    mut trees: Single<&mut ColliderTrees>,
+    mut moved_proxies: Single<&mut MovedProxies>,
+    mut enlarged_proxies: Single<&mut EnlargedProxies>,
     collider_context: StaticSystemParam<C::Context>,
-    mut diagnostics: ResMut<ColliderTreeDiagnostics>,
+    mut diagnostics: Single<&mut ColliderTreeDiagnostics>,
     last_tick: Res<LastPhysicsTick>,
     system_tick: SystemChangeTick,
 ) {
@@ -1018,7 +1016,7 @@ fn update_tree(
     }
 }
 
-fn clear_moved_proxies(mut moved_proxies: ResMut<MovedProxies>, mut trees: ResMut<ColliderTrees>) {
+fn clear_moved_proxies(mut moved_proxies: Single<&mut MovedProxies>, mut trees: Single<&mut ColliderTrees>) {
     moved_proxies.clear();
     trees.iter_trees_mut().for_each(|t| t.moved_proxies.clear());
 }

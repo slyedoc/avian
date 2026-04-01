@@ -269,7 +269,7 @@ fn writeback_solver_bodies(
         &mut LinearVelocity,
         &mut AngularVelocity,
     )>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut diagnostics: Single<&mut SolverDiagnostics>,
 ) {
     let start = bevy::platform::time::Instant::now();
 

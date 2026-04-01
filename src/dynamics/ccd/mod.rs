@@ -525,9 +525,9 @@ fn solve_swept_ccd(
     bodies: Query<SweptCcdBodyQuery>,
     colliders: Query<(&Collider, &ColliderOf)>,
     time: Res<Time>,
-    contact_graph: Res<ContactGraph>,
-    narrow_phase_config: Res<NarrowPhaseConfig>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    contact_graph: Single<&ContactGraph>,
+    narrow_phase_config: Single<&NarrowPhaseConfig>,
+    mut diagnostics: Single<&mut SolverDiagnostics>,
 ) {
     let start = crate::utils::Instant::now();
 

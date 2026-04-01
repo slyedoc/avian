@@ -1,9 +1,9 @@
 use core::time::Duration;
 
-use avian2d::prelude::SubstepCount;
 use bevy::{
     MinimalPlugins,
     app::{App, Plugin, PluginGroup, PluginGroupBuilder},
+    ecs::{component::Component, entity::Entity, query::With},
     time::{Time, TimeUpdateStrategy},
     transform::TransformPlugin,
 };
@@ -45,6 +45,14 @@ impl Plugin for Benchmark2dCorePlugin {
         app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f64(
             1.0 / 60.0,
         )));
-        app.insert_resource(SubstepCount(4));
     }
+}
+
+fn set_component<T: Component>(app: &mut App, value: T) {
+    let world = app.world_mut();
+    let entity = world
+        .query_filtered::<Entity, With<T>>()
+        .single(world)
+        .unwrap();
+    world.entity_mut(entity).insert(value);
 }

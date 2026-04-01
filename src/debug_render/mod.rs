@@ -129,7 +129,7 @@ impl Plugin for PhysicsDebugPlugin {
                     any(feature = "parry-f32", feature = "parry-f64")
                 ))]
                 debug_render_shapecasts,
-                debug_render_islands.run_if(resource_exists::<PhysicsIslands>),
+                debug_render_islands.run_if(|q: Query<(), With<PhysicsIslands>>| !q.is_empty()),
             )
                 .after(TransformSystems::Propagate)
                 .run_if(|store: Res<GizmoConfigStore>| store.config::<PhysicsGizmos>().0.enabled),
@@ -151,7 +151,7 @@ fn debug_render_axes(
     )>,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
-    length_unit: Res<PhysicsLengthUnit>,
+    length_unit: Single<&PhysicsLengthUnit>,
 ) {
     let config = store.config::<PhysicsGizmos>().1;
     for (transform, local_com, sleeping, render_config) in &bodies {
@@ -254,7 +254,7 @@ fn debug_render_aabbs(
 }
 
 fn debug_render_bvh(
-    bvh: Res<ColliderTrees>,
+    bvh: Single<&ColliderTrees>,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
 ) {
@@ -318,7 +318,7 @@ fn debug_render_contacts(
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
     time: Res<Time<Substeps>>,
-    length_unit: Res<PhysicsLengthUnit>,
+    length_unit: Single<&PhysicsLengthUnit>,
 ) {
     let config = store.config::<PhysicsGizmos>().1;
 
@@ -421,7 +421,7 @@ fn debug_render_raycasts(
     query: Query<(&RayCaster, &RayHits)>,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
-    length_unit: Res<PhysicsLengthUnit>,
+    length_unit: Single<&PhysicsLengthUnit>,
 ) {
     let config = store.config::<PhysicsGizmos>().1;
     for (ray, hits) in &query {
@@ -451,7 +451,7 @@ fn debug_render_shapecasts(
     query: Query<(&ShapeCaster, &ShapeHits)>,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
-    length_unit: Res<PhysicsLengthUnit>,
+    length_unit: Single<&PhysicsLengthUnit>,
 ) {
     let config = store.config::<PhysicsGizmos>().1;
     for (shape_caster, hits) in &query {
@@ -478,7 +478,7 @@ fn debug_render_shapecasts(
 }
 
 fn debug_render_islands(
-    islands: Res<PhysicsIslands>,
+    islands: Single<&PhysicsIslands>,
     bodies: Query<(&RigidBodyColliders, &BodyIslandNode)>,
     aabbs: Query<&ColliderAabb>,
     mut gizmos: Gizmos<PhysicsGizmos>,

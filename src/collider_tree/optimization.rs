@@ -16,8 +16,7 @@ pub(super) struct ColliderTreeOptimizationPlugin;
 
 impl Plugin for ColliderTreeOptimizationPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ColliderTreeOptimization>()
-            .init_resource::<OptimizationTasks>();
+        // ColliderTreeOptimization and OptimizationTasks are on the PhysicsWorld entity.
 
         app.add_systems(
             PhysicsSchedule,
@@ -32,7 +31,7 @@ impl Plugin for ColliderTreeOptimizationPlugin {
 
 /// Settings for optimizing each [`ColliderTree`].
 // TODO: Per-tree settings could be useful.
-#[derive(Resource, Debug, PartialEq, Reflect)]
+#[derive(Component, Debug, PartialEq, Reflect)]
 pub struct ColliderTreeOptimization {
     /// The optimization mode for the collider tree.
     ///
@@ -157,9 +156,9 @@ impl TreeOptimizationMode {
     }
 }
 
-/// A resource tracking ongoing optimization tasks for [`ColliderTree`]s.
-#[derive(Resource, Default, Deref, DerefMut)]
-struct OptimizationTasks(Vec<Task<CommandQueue>>);
+/// Tracks ongoing optimization tasks for [`ColliderTree`]s.
+#[derive(Component, Default, Deref, DerefMut)]
+pub(crate) struct OptimizationTasks(Vec<Task<CommandQueue>>);
 
 /// Begins optimizing the dynamic and kinematic [`ColliderTree`]s to maintain good query performance.
 ///
@@ -167,10 +166,10 @@ struct OptimizationTasks(Vec<Task<CommandQueue>>);
 /// that runs concurrently with the simulation step. Otherwise, the optimization is performed
 /// in-place on the main thread.
 fn optimize_trees(
-    mut collider_trees: ResMut<ColliderTrees>,
-    mut optimization_tasks: ResMut<OptimizationTasks>,
-    optimization_settings: Res<ColliderTreeOptimization>,
-    mut diagnostics: ResMut<ColliderTreeDiagnostics>,
+    mut collider_trees: Single<&mut ColliderTrees>,
+    mut optimization_tasks: Single<&mut OptimizationTasks>,
+    optimization_settings: Single<&ColliderTreeOptimization>,
+    mut diagnostics: Single<&mut ColliderTreeDiagnostics>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -274,8 +273,9 @@ fn spawn_optimization_task(
         let mut command_queue = CommandQueue::default();
         command_queue.push(move |world: &mut World| {
             let mut collider_trees = world
-                .get_resource_mut::<ColliderTrees>()
-                .expect("ColliderTrees resource missing");
+                .query::<&mut ColliderTrees>()
+                .single_mut(world)
+                .expect("ColliderTrees component missing");
             let collider_tree = collider_trees.tree_for_type_mut(tree_type);
             collider_tree.bvh = tree.bvh;
             collider_tree.workspace = tree.workspace;
@@ -288,8 +288,8 @@ fn spawn_optimization_task(
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "unknown")))]
 fn block_on_optimize_trees(
     mut commands: Commands,
-    mut optimization: ResMut<OptimizationTasks>,
-    mut diagnostics: ResMut<ColliderTreeDiagnostics>,
+    mut optimization: Single<&mut OptimizationTasks>,
+    mut diagnostics: Single<&mut ColliderTreeDiagnostics>,
 ) {
     let start = crate::utils::Instant::now();
 

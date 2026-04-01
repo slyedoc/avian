@@ -20,8 +20,7 @@ impl Plugin for SolverSchedulePlugin {
         app.register_type::<Time<Substeps>>();
 
         // Initialize resources.
-        app.insert_resource(Time::new_with(Substeps))
-            .init_resource::<SubstepCount>();
+        app.insert_resource(Time::new_with(Substeps));
 
         // Get the `PhysicsSchedule`, and panic if it doesn't exist.
         let physics = app
@@ -178,10 +177,10 @@ pub type SubstepSolverSet = SubstepSolverSystems;
 ///         .run();
 /// }
 /// ```
-#[derive(Debug, Reflect, Resource, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Reflect, Component, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, Resource, PartialEq)]
+#[reflect(Debug, Component, PartialEq)]
 pub struct SubstepCount(pub u32);
 
 impl Default for SubstepCount {
@@ -193,7 +192,7 @@ impl Default for SubstepCount {
 /// Runs the [`SubstepSchedule`].
 fn run_substep_schedule(world: &mut World) {
     let delta = world.resource::<Time<Physics>>().delta();
-    let SubstepCount(substeps) = *world.resource::<SubstepCount>();
+    let SubstepCount(substeps) = *world.query::<&SubstepCount>().single(world).unwrap();
     let sub_delta = delta.div_f64(substeps as f64);
 
     let mut sub_delta_time = world.resource_mut::<Time<Substeps>>();

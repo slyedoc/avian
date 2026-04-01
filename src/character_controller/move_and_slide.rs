@@ -83,7 +83,7 @@ pub struct MoveAndSlide<'w, 's> {
     >,
     /// A units-per-meter scaling factor that adjusts some thresholds and tolerances
     /// to the scale of the world for better behavior.
-    pub length_unit: Res<'w, PhysicsLengthUnit>,
+    pub length_unit: Single<'w, 's, &'static PhysicsLengthUnit>,
 }
 
 /// Configuration for [`MoveAndSlide::move_and_slide`].
