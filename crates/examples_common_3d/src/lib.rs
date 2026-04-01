@@ -32,7 +32,7 @@ impl Plugin for ExampleCommonPlugin {
             (
                 toggle_diagnostics_ui.run_if(input_just_pressed(KeyCode::KeyU)),
                 toggle_paused.run_if(input_just_pressed(KeyCode::KeyP)),
-                step.run_if(physics_paused.and(input_just_pressed(KeyCode::Enter))),
+                step.run_if(physics_paused.and_then(input_just_pressed(KeyCode::Enter))),
             ),
         );
     }

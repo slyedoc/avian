@@ -114,7 +114,7 @@ bevy_heavy = { git = "https://github.com/slyedoc/bevy_heavy", branch = "bevy-mai
 glam = { version = "0.31", features = ["bytemuck"] }
 bytemuck = "1.19"
 criterion = { version = "0.8", features = ["html_reports"] }
-bevy_mod_debugdump = { git = "https://github.com/jakobhellermann/bevy_mod_debugdump", branch = "bevy-main" }
+bevy_mod_debugdump = { git = "https://github.com/slyedoc/bevy_mod_debugdump", branch = "bevy-main" }
 
 [lints]
 workspace = true

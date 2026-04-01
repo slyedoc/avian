@@ -115,7 +115,7 @@ bevy_heavy = { git = "https://github.com/slyedoc/bevy_heavy", branch = "bevy-mai
     "approx",
 ] }
 criterion = { version = "0.8", features = ["html_reports"] }
-bevy_mod_debugdump = { git = "https://github.com/jakobhellermann/bevy_mod_debugdump", branch = "bevy-main" }
+bevy_mod_debugdump = { git = "https://github.com/slyedoc/bevy_mod_debugdump", branch = "bevy-main" }
 rand = "0.9"
 
 [lints]
