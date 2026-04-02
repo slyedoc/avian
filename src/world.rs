@@ -55,7 +55,6 @@ use crate::{
 #[derive(Component, Default)]
 #[require(
     Transform,
-    Visibility,
     Gravity,
     PhysicsLengthUnit,
     SolverConfig,
