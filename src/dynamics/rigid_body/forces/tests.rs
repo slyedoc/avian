@@ -32,7 +32,7 @@ fn create_app() -> App {
     ));
 
     // Use 20 substeps.
-    set_component(&mut app, SubstepCount(20));
+    app.insert_resource(SubstepCount(20));
 
     // Set gravity to 9.81 m/s².
     set_component(&mut app, Gravity(Vector::NEG_Y * 9.81));

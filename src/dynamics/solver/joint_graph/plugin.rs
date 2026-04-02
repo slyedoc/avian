@@ -13,7 +13,7 @@ use crate::{
     },
     prelude::{
         ContactGraph, JointCollisionDisabled, JointDisabled, PhysicsSchedule, PhysicsStepSystems,
-        PhysicsWorld, RigidBodyColliders, WakeIslands,
+        PhysicsWorld, PhysicsWorldLookup, RigidBodyColliders, WakeIslands,
     },
 };
 use bevy::{
@@ -127,6 +127,7 @@ fn add_joint_to_graph<
     mut commands: Commands,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     mut worlds: Query<(&mut ContactGraph, &mut JointGraph, &mut PhysicsIslands), With<PhysicsWorld>>,
+    world_lookup: PhysicsWorldLookup,
 ) {
     let entity = trigger.event_target();
 
@@ -134,7 +135,8 @@ fn add_joint_to_graph<
         return;
     };
 
-    let Ok((mut contact_graph, mut joint_graph, mut islands)) = worlds.single_mut() else {
+    let world_entity = world_lookup.world_entity_of(entity);
+    let Ok((mut contact_graph, mut joint_graph, mut islands)) = worlds.get_mut(world_entity) else {
         return;
     };
 
@@ -157,7 +159,7 @@ fn add_joint_to_graph<
         if let Some(island) = island
             && island.is_sleeping
         {
-            commands.queue(WakeIslands(vec![island.id]));
+            commands.queue(WakeIslands { world_entity, islands: vec![island.id] });
         }
     }
 }
@@ -167,10 +169,12 @@ fn remove_joint_from_graph<E: EntityEvent, B: Bundle>(
     mut commands: Commands,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     mut worlds: Query<(&mut ContactGraph, &mut JointGraph, &mut PhysicsIslands), With<PhysicsWorld>>,
+    world_lookup: PhysicsWorldLookup,
 ) {
     let entity = trigger.event_target();
 
-    let Ok((contact_graph, mut joint_graph, mut islands)) = worlds.single_mut() else {
+    let world_entity = world_lookup.world_entity_of(entity);
+    let Ok((contact_graph, mut joint_graph, mut islands)) = worlds.get_mut(world_entity) else {
         return;
     };
 
@@ -187,7 +191,7 @@ fn remove_joint_from_graph<E: EntityEvent, B: Bundle>(
     ) {
         // Wake up the island if it was sleeping.
         if island.is_sleeping {
-            commands.queue(WakeIslands(vec![island.id]));
+            commands.queue(WakeIslands { world_entity, islands: vec![island.id] });
         }
     }
 
@@ -250,11 +254,13 @@ fn on_disable_joint_collision(
     trigger: On<Add, JointCollisionDisabled>,
     query: Query<&RigidBodyColliders>,
     mut worlds: Query<(&JointGraph, &mut ContactGraph, &mut ConstraintGraph), With<PhysicsWorld>>,
+    world_lookup: PhysicsWorldLookup,
 ) {
-    let Ok((joint_graph, mut contact_graph, mut constraint_graph)) = worlds.single_mut() else {
+    let entity = trigger.entity;
+    let world_entity = world_lookup.world_entity_of(entity);
+    let Ok((joint_graph, mut contact_graph, mut constraint_graph)) = worlds.get_mut(world_entity) else {
         return;
     };
-    let entity = trigger.entity;
 
     // Iterate through each collider of the body with fewer colliders,
     // find contacts with the other body, and remove them.
@@ -304,8 +310,12 @@ fn on_change_joint_entities<T: Component + EntityConstraint<2>>(
     mut commands: Commands,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     mut worlds: Query<(&mut JointGraph, &mut ContactGraph, &mut PhysicsIslands), With<PhysicsWorld>>,
+    world_lookup: PhysicsWorldLookup,
 ) {
-    let Ok((mut joint_graph, mut contact_graph, mut islands)) = worlds.single_mut() else {
+    // TODO: Per-entity world lookup for each changed joint
+    let Some(first_entity) = query.iter().next().map(|(e, _)| e) else { return; };
+    let world_entity = world_lookup.world_entity_of(first_entity);
+    let Ok((mut joint_graph, mut contact_graph, mut islands)) = worlds.get_mut(world_entity) else {
         return;
     };
     let mut islands_to_wake: Vec<IslandId> = Vec::new();
@@ -358,7 +368,7 @@ fn on_change_joint_entities<T: Component + EntityConstraint<2>>(
         islands_to_wake.dedup();
 
         // Wake up the islands that were previously sleeping.
-        commands.queue(WakeIslands(islands_to_wake));
+        commands.queue(WakeIslands { world_entity, islands: islands_to_wake });
     }
 }
 

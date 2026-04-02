@@ -526,9 +526,9 @@ fn solve_swept_ccd(
     colliders: Query<(&Collider, &ColliderOf)>,
     time: Res<Time>,
     mut worlds: Query<(&ContactGraph, &NarrowPhaseConfig, &mut SolverDiagnostics), With<PhysicsWorld>>,
+    main_world: Res<MainPhysicsWorldEntity>,
 ) {
-    // TODO: Per-world CCD iteration
-    let Ok((contact_graph, narrow_phase_config, mut diagnostics)) = worlds.single_mut() else {
+    let Ok((contact_graph, narrow_phase_config, mut diagnostics)) = worlds.get_mut(main_world.0) else {
         return;
     };
     let start = crate::utils::Instant::now();

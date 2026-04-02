@@ -86,7 +86,7 @@ use bevy::{
 #[cfg(feature = "bevy_diagnostic")]
 use bevy::{
     diagnostic::{Diagnostic, Diagnostics, RegisterDiagnostic},
-    prelude::{Plugin, Res},
+    prelude::Plugin,
 };
 use core::time::Duration;
 

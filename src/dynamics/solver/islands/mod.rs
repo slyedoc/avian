@@ -45,7 +45,7 @@
 pub(crate) mod sleeping;
 pub use sleeping::{IslandSleepingPlugin, SleepBody, SleepIslands, WakeBody, WakeIslands};
 
-use crate::world::{MainPhysicsWorldEntity, PhysicsWorld};
+use crate::world::PhysicsWorld;
 use bevy::{
     ecs::{entity_disabling::Disabled, lifecycle::HookContext, world::DeferredWorld},
     prelude::*,
@@ -1322,8 +1322,8 @@ impl BodyIslandNode {
 
     // Initialize a new island when `BodyIslandNode` is added to a body.
     fn on_add(mut world: DeferredWorld, ctx: HookContext) {
-        // Create a new island for the body.
-        let world_entity = world.resource::<MainPhysicsWorldEntity>().0;
+        // Create a new island in the body's physics world.
+        let world_entity = crate::world::find_physics_world_or_main(&world, ctx.entity);
         let mut islands = world.get_mut::<PhysicsIslands>(world_entity).unwrap();
         let island_id = islands.create_island_with(|island| {
             island.head_body = Some(ctx.entity);
@@ -1343,6 +1343,9 @@ impl BodyIslandNode {
         let prev_body_entity = body_island.prev;
         let next_body_entity = body_island.next;
 
+        // Find the body's physics world.
+        let world_entity = crate::world::find_physics_world_or_main(&world, ctx.entity);
+
         // Fix the linked list of bodies in the island.
         if let Some(entity) = prev_body_entity {
             let mut prev_body_island = world.get_mut::<BodyIslandNode>(entity).unwrap();
@@ -1353,7 +1356,6 @@ impl BodyIslandNode {
             next_body_island.prev = prev_body_entity;
         }
 
-        let world_entity = world.resource::<MainPhysicsWorldEntity>().0;
         let mut islands = world.get_mut::<PhysicsIslands>(world_entity).unwrap();
         let island = islands
             .get_mut(island_id)
@@ -1374,7 +1376,6 @@ impl BodyIslandNode {
                 debug_assert!(island.body_count == 0);
                 debug_assert!(island.contact_count == 0);
 
-                let world_entity = world.resource::<MainPhysicsWorldEntity>().0;
                 world
                     .get_mut::<PhysicsIslands>(world_entity)
                     .unwrap()

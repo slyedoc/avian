@@ -1,4 +1,4 @@
-use crate::{collider_tree::ColliderTrees, collision::collider::contact_query, prelude::*};
+use crate::{collider_tree::ColliderTrees, collision::collider::contact_query, prelude::*, world::PhysicsWorld};
 use bevy::{ecs::system::SystemParam, prelude::*};
 use parry::query::ShapeCastOptions;
 
@@ -60,10 +60,16 @@ use parry::query::ShapeCastOptions;
 pub struct SpatialQuery<'w, 's> {
     colliders: Query<'w, 's, (&'static Position, &'static Rotation, &'static Collider)>,
     aabbs: Query<'w, 's, &'static ColliderAabb>,
-    collider_trees: Single<'w, 's, &'static ColliderTrees>,
+    collider_trees: Query<'w, 's, &'static ColliderTrees, With<PhysicsWorld>>,
+    main_world: Res<'w, MainPhysicsWorldEntity>,
 }
 
 impl SpatialQuery<'_, '_> {
+    fn trees(&self) -> &ColliderTrees {
+        // TODO: Support querying specific worlds.
+        self.collider_trees.get(self.main_world.0).unwrap()
+    }
+
     /// Casts a [ray](spatial_query#raycasting) and computes the closest [hit](RayHitData) with a collider.
     /// If there are no hits, `None` is returned.
     ///
@@ -186,7 +192,7 @@ impl SpatialQuery<'_, '_> {
 
         let mut closest_hit: Option<RayHitData> = None;
 
-        self.collider_trees.iter_trees().for_each(|tree| {
+        self.trees().iter_trees().for_each(|tree| {
             tree.ray_traverse_closest(ray, max_distance, |proxy_id| {
                 let proxy = tree.get_proxy(proxy_id).unwrap();
                 if !filter.test(proxy.collider, proxy.layers) || !predicate(proxy.collider) {
@@ -362,7 +368,7 @@ impl SpatialQuery<'_, '_> {
     ) {
         let ray = Ray::new(origin.f32(), direction);
 
-        self.collider_trees.iter_trees().for_each(|tree| {
+        self.trees().iter_trees().for_each(|tree| {
             tree.ray_traverse_all(ray, max_distance, |proxy_id| {
                 let proxy = tree.get_proxy(proxy_id).unwrap();
 
@@ -535,7 +541,7 @@ impl SpatialQuery<'_, '_> {
 
         let aabb = obvhs::aabb::Aabb::from(shape.aabb(origin, shape_rotation));
 
-        self.collider_trees.iter_trees().for_each(|tree| {
+        self.trees().iter_trees().for_each(|tree| {
             tree.sweep_traverse_closest(
                 aabb,
                 direction,
@@ -749,7 +755,7 @@ impl SpatialQuery<'_, '_> {
     ) {
         let aabb = obvhs::aabb::Aabb::from(shape.aabb(origin, shape_rotation));
 
-        self.collider_trees.iter_trees().for_each(|tree| {
+        self.trees().iter_trees().for_each(|tree| {
             tree.sweep_traverse_all(
                 aabb,
                 direction,
@@ -899,7 +905,7 @@ impl SpatialQuery<'_, '_> {
         let mut closest_distance_squared = Scalar::INFINITY;
         let mut closest_projection: Option<PointProjection> = None;
 
-        self.collider_trees.iter_trees().for_each(|tree| {
+        self.trees().iter_trees().for_each(|tree| {
             tree.squared_distance_traverse_closest(point, Scalar::INFINITY, |proxy_id| {
                 let proxy = tree.get_proxy(proxy_id).unwrap();
                 if !filter.test(proxy.collider, proxy.layers) || !predicate(proxy.collider) {
@@ -1019,7 +1025,7 @@ impl SpatialQuery<'_, '_> {
         filter: &SpatialQueryFilter,
         mut callback: impl FnMut(Entity) -> bool,
     ) {
-        self.collider_trees.iter_trees().for_each(|tree| {
+        self.trees().iter_trees().for_each(|tree| {
             tree.point_traverse(point, |proxy_id| {
                 let proxy = tree.get_proxy(proxy_id).unwrap();
 
@@ -1116,7 +1122,7 @@ impl SpatialQuery<'_, '_> {
         aabb: ColliderAabb,
         mut callback: impl FnMut(Entity) -> bool,
     ) {
-        self.collider_trees.iter_trees().for_each(|tree| {
+        self.trees().iter_trees().for_each(|tree| {
             tree.aabb_traverse(obvhs::aabb::Aabb::from(aabb), |proxy_id| {
                 let proxy = tree.get_proxy(proxy_id).unwrap();
                 let Ok(proxy_aabb) = self.aabbs.get(proxy.collider) else {
@@ -1248,7 +1254,7 @@ impl SpatialQuery<'_, '_> {
     ) {
         let aabb = obvhs::aabb::Aabb::from(shape.aabb(shape_position, shape_rotation));
 
-        self.collider_trees.iter_trees().for_each(|tree| {
+        self.trees().iter_trees().for_each(|tree| {
             tree.aabb_traverse(aabb, |proxy_id| {
                 let proxy = tree.get_proxy(proxy_id).unwrap();
                 if !filter.test(proxy.collider, proxy.layers) {

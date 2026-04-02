@@ -167,11 +167,11 @@ pub(crate) struct OptimizationTasks(Vec<Task<CommandQueue>>);
 /// in-place on the main thread.
 fn optimize_trees(
     mut worlds: Query<
-        (&mut ColliderTrees, &mut OptimizationTasks, &ColliderTreeOptimization, &mut ColliderTreeDiagnostics),
+        (Entity, &mut ColliderTrees, &mut OptimizationTasks, &ColliderTreeOptimization, &mut ColliderTreeDiagnostics),
         With<PhysicsWorld>,
     >,
 ) {
-    for (mut collider_trees, mut optimization_tasks, optimization_settings, mut diagnostics) in worlds.iter_mut() {
+    for (world_entity, mut collider_trees, mut optimization_tasks, optimization_settings, mut diagnostics) in worlds.iter_mut() {
     let start = crate::utils::Instant::now();
 
     let task_pool = AsyncComputeTaskPool::get();
@@ -215,7 +215,7 @@ fn optimize_trees(
                 workspace: core::mem::take(&mut tree.workspace),
             };
 
-            let task = spawn_optimization_task(task_pool, new_tree, tree_type, move |tree| {
+            let task = spawn_optimization_task(task_pool, world_entity, new_tree, tree_type, move |tree| {
                 optimize_tree_in_place(tree, optimization_strategy);
             });
 
@@ -265,6 +265,7 @@ fn optimize_tree_in_place(tree: &mut ColliderTree, optimization_strategy: TreeOp
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "unknown")))]
 fn spawn_optimization_task(
     task_pool: &AsyncComputeTaskPool,
+    world_entity: Entity,
     mut tree: ColliderTree,
     tree_type: ColliderTreeType,
     optimize: impl FnOnce(&mut ColliderTree) + Send + 'static,
@@ -275,8 +276,7 @@ fn spawn_optimization_task(
         let mut command_queue = CommandQueue::default();
         command_queue.push(move |world: &mut World| {
             let mut collider_trees = world
-                .query::<&mut ColliderTrees>()
-                .single_mut(world)
+                .get_mut::<ColliderTrees>(world_entity)
                 .expect("ColliderTrees component missing");
             let collider_tree = collider_trees.tree_for_type_mut(tree_type);
             collider_tree.bvh = tree.bvh;

@@ -57,7 +57,7 @@ fn collect_collision_pairs<H: CollisionHooks>(
 {
     let hooks = hooks.into_inner();
 
-    for (mut trees, moved_proxies, mut contact_graph, joint_graph, mut diagnostics) in worlds.iter_mut() {
+    for (trees, moved_proxies, mut contact_graph, joint_graph, mut diagnostics) in worlds.iter_mut() {
         let start = crate::utils::Instant::now();
 
         let mut broad_collision_pairs = Vec::<(ColliderTreeProxyKey, ColliderTreeProxyKey)>::new();

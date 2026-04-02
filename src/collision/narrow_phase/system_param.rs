@@ -58,6 +58,36 @@ struct RigidBodyQuery {
     speculative_margin: Option<Read<SpeculativeMargin>>,
 }
 
+/// Per-world data needed by the [`NarrowPhase`].
+#[derive(QueryData)]
+#[query_data(mutable)]
+#[allow(missing_docs)]
+pub struct NarrowPhaseWorldQuery {
+    /// The entity of this physics world.
+    pub world_entity: Entity,
+    /// The contact graph.
+    pub contact_graph: &'static mut ContactGraph,
+    /// The joint graph.
+    pub joint_graph: &'static mut JointGraph,
+    /// The constraint graph.
+    pub constraint_graph: &'static mut ConstraintGraph,
+    /// Physics islands.
+    pub islands: &'static mut PhysicsIslands,
+    /// Contact status bits.
+    pub(crate) contact_status_bits: &'static mut ContactStatusBits,
+    /// Thread-local contact status bits.
+    #[cfg(feature = "parallel")]
+    pub(crate) thread_local_contact_status_bits: &'static mut ThreadLocalContactStatusBits,
+    /// Narrow phase config.
+    pub config: Ref<'static, NarrowPhaseConfig>,
+    /// Default friction.
+    pub default_friction: &'static DefaultFriction,
+    /// Default restitution.
+    pub default_restitution: &'static DefaultRestitution,
+    /// Physics length unit.
+    pub length_unit: &'static PhysicsLengthUnit,
+}
+
 /// A system parameter for managing the narrow phase.
 ///
 /// Responsibilities:
@@ -68,24 +98,12 @@ struct RigidBodyQuery {
 /// - Adds [`ContactManifold`]s to the [`ConstraintGraph`] when they are created.
 /// - Removes [`ContactManifold`]s from the [`ConstraintGraph`] when they are destroyed.
 #[derive(SystemParam)]
-#[expect(missing_docs)]
 pub struct NarrowPhase<'w, 's, C: AnyCollider> {
     collider_query: Query<'w, 's, ColliderQuery<C>, Without<ColliderDisabled>>,
     colliding_entities_query: Query<'w, 's, &'static mut CollidingEntities>,
     body_query: Query<'w, 's, RigidBodyQuery, Without<RigidBodyDisabled>>,
     body_islands:
         Query<'w, 's, &'static mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
-    pub contact_graph: Single<'w, 's, &'static mut ContactGraph>,
-    pub joint_graph: Single<'w, 's, &'static mut JointGraph>,
-    pub constraint_graph: Single<'w, 's, &'static mut ConstraintGraph>,
-    pub islands: Query<'w, 's, &'static mut PhysicsIslands>,
-    contact_status_bits: Single<'w, 's, &'static mut ContactStatusBits>,
-    #[cfg(feature = "parallel")]
-    thread_local_contact_status_bits: Single<'w, 's, &'static mut ThreadLocalContactStatusBits>,
-    pub config: Single<'w, 's, Ref<'static, NarrowPhaseConfig>>,
-    default_friction: Single<'w, 's, &'static DefaultFriction>,
-    default_restitution: Single<'w, 's, &'static DefaultRestitution>,
-    length_unit: Single<'w, 's, &'static PhysicsLengthUnit>,
     // These are scaled by the length unit.
     default_speculative_margin: Local<'s, Scalar>,
     contact_tolerance: Local<'s, Scalar>,
@@ -116,6 +134,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
     /// - Removes [`ContactManifold`]s from the [`ConstraintGraph`] when they are destroyed.
     pub fn update<H: CollisionHooks>(
         &mut self,
+        w: &mut NarrowPhaseWorldQueryItem,
         collision_started_writer: &mut MessageWriter<CollisionStart>,
         collision_ended_writer: &mut MessageWriter<CollisionEnd>,
         delta_secs: Scalar,
@@ -126,14 +145,14 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
         for<'w, 's> SystemParamItem<'w, 's, H>: CollisionHooks,
     {
         // Cache default margins scaled by the length unit.
-        if self.config.is_changed() {
+        if w.config.is_changed() {
             *self.default_speculative_margin =
-                self.length_unit.0 * self.config.default_speculative_margin;
-            *self.contact_tolerance = self.length_unit.0 * self.config.contact_tolerance;
+                w.length_unit.0 * w.config.default_speculative_margin;
+            *self.contact_tolerance = w.length_unit.0 * w.config.contact_tolerance;
         }
 
         // Update contacts for all contact pairs.
-        self.update_contacts::<H>(delta_secs, hooks, context, commands);
+        self.update_contacts::<H>(w, delta_secs, hooks, context, commands);
 
         let mut islands_to_wake: Vec<IslandId> = Vec::with_capacity(128);
 
@@ -141,12 +160,12 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
         //
         // Iterating over set bits is done efficiently with the "count trailing zeros" method:
         // https://lemire.me/blog/2018/02/21/iterating-over-set-bits-quickly/
-        for (i, mut bits) in self.contact_status_bits.blocks().enumerate() {
+        for (i, mut bits) in w.contact_status_bits.blocks().enumerate() {
             while bits != 0 {
                 let trailing_zeros = bits.trailing_zeros();
                 let contact_id = ContactId(i as u32 * 64 + trailing_zeros);
 
-                let (contact_edge, contact_pair) = self
+                let (contact_edge, contact_pair) = w
                     .contact_graph
                     .get_mut_by_id(contact_id)
                     .unwrap_or_else(|| panic!("Contact pair not found for {contact_id:?}"));
@@ -188,8 +207,8 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
 
                         // Remove the contact pair from the constraint graph.
                         for _ in 0..contact_edge.constraint_handles.len() {
-                            self.constraint_graph.pop_manifold(
-                                &mut self.contact_graph.edges,
+                            w.constraint_graph.pop_manifold(
+                                &mut w.contact_graph.edges,
                                 contact_id,
                                 body1,
                                 body2,
@@ -197,18 +216,19 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                         }
 
                         // Unlink the contact pair from its island.
-                        if has_island && let Ok(mut islands) = self.islands.single_mut() {
+                        if has_island {
+                            let islands = &mut *w.islands;
                             islands.remove_contact(
                                 contact_id,
                                 &mut self.body_islands,
-                                &mut self.contact_graph.edges,
-                                &self.joint_graph,
+                                &mut w.contact_graph.edges,
+                                &w.joint_graph,
                             );
                         }
                     }
 
                     // Remove the contact edge from the contact graph.
-                    self.contact_graph.remove_edge_by_id(&pair_key, contact_id);
+                    w.contact_graph.remove_edge_by_id(&pair_key, contact_id);
                 } else if contact_pair.collision_started() {
                     // Send collision started event.
                     if contact_edge.events_enabled() {
@@ -240,17 +260,18 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                     if contact_pair.generates_constraints() {
                         // Add the contact pair to the constraint graph.
                         for _ in contact_pair.manifolds.iter() {
-                            self.constraint_graph
+                            w.constraint_graph
                                 .push_manifold(contact_edge, contact_pair);
                         }
 
                         // Link the contact pair to an island.
-                        if let Ok(mut islands) = self.islands.single_mut() {
+                        {
+                            let islands = &mut *w.islands;
                             let island = islands.add_contact(
                                 contact_id,
                                 &mut self.body_islands,
-                                &mut self.contact_graph,
-                                &mut self.joint_graph,
+                                &mut w.contact_graph,
+                                &mut w.joint_graph,
                             );
 
                             if let Some(island) = island
@@ -298,8 +319,8 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                         && let (Some(body1), Some(body2)) = (contact_pair.body1, contact_pair.body2)
                     {
                         for _ in 0..contact_edge.constraint_handles.len() {
-                            self.constraint_graph.pop_manifold(
-                                &mut self.contact_graph.edges,
+                            w.constraint_graph.pop_manifold(
+                                &mut w.contact_graph.edges,
                                 contact_id,
                                 body1,
                                 body2,
@@ -307,12 +328,13 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                         }
 
                         // Unlink the contact pair from its island.
-                        if let Ok(mut islands) = self.islands.single_mut() {
+                        {
+                            let islands = &mut *w.islands;
                             let island = islands.remove_contact(
                                 contact_id,
                                 &mut self.body_islands,
-                                &mut self.contact_graph.edges,
-                                &self.joint_graph,
+                                &mut w.contact_graph.edges,
+                                &w.joint_graph,
                             );
 
                             // TODO: Do we need this?
@@ -334,17 +356,18 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
 
                     // Add the contact pair to the constraint graph.
                     for _ in contact_pair.manifolds.iter() {
-                        self.constraint_graph
+                        w.constraint_graph
                             .push_manifold(contact_edge, contact_pair);
                     }
 
                     // Link the contact pair to an island.
-                    if let Ok(mut islands) = self.islands.single_mut() {
+                    {
+                            let islands = &mut *w.islands;
                         let island = islands.add_contact(
                             contact_id,
                             &mut self.body_islands,
-                            &mut self.contact_graph,
-                            &mut self.joint_graph,
+                            &mut w.contact_graph,
+                            &mut w.joint_graph,
                         );
 
                         if let Some(island) = island
@@ -361,7 +384,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                     // The contact pair is still touching, but the manifold count has increased.
                     // Add the new manifolds to the constraint graph.
                     for _ in 0..contact_pair.manifold_count_change {
-                        self.constraint_graph
+                        w.constraint_graph
                             .push_manifold(contact_edge, contact_pair);
                     }
                     contact_pair.manifold_count_change = 0;
@@ -376,8 +399,8 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
 
                     if let (Some(body1), Some(body2)) = (contact_pair.body1, contact_pair.body2) {
                         for _ in 0..removal_count {
-                            self.constraint_graph.pop_manifold(
-                                &mut self.contact_graph.edges,
+                            w.constraint_graph.pop_manifold(
+                                &mut w.contact_graph.edges,
                                 contact_id,
                                 body1,
                                 body2,
@@ -396,8 +419,9 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
             islands_to_wake.dedup();
 
             // Wake up the islands that were previously sleeping.
+            let world_entity = w.world_entity;
             commands.command_scope(|mut commands| {
-                commands.queue(WakeIslands(islands_to_wake));
+                commands.queue(WakeIslands { world_entity, islands: islands_to_wake });
             });
         }
     }
@@ -439,6 +463,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
     /// The order of contact pairs is preserved.
     fn update_contacts<H: CollisionHooks>(
         &mut self,
+        w: &mut NarrowPhaseWorldQueryItem,
         delta_secs: Scalar,
         hooks: &SystemParamItem<H>,
         collider_context: &SystemParamItem<C::Context>,
@@ -449,13 +474,13 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
         // Contact bit vecs must be sized based on the full contact capacity,
         // not the number of active contact pairs, because pair indices
         // are unstable and can be invalidated when pairs are removed.
-        let bit_count = self.contact_graph.edges.raw_edges().len();
+        let bit_count = w.contact_graph.edges.raw_edges().len();
 
         // Clear the bit vector used to track status changes for each contact pair.
-        self.contact_status_bits.set_bit_count_and_clear(bit_count);
+        w.contact_status_bits.set_bit_count_and_clear(bit_count);
 
         #[cfg(feature = "parallel")]
-        self.thread_local_contact_status_bits
+        w.thread_local_contact_status_bits
             .iter_mut()
             .for_each(|context| {
                 let bit_vec_mut = &mut context.borrow_mut();
@@ -477,16 +502,16 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
         //
         // TODO: An alternative to thread-local bit vectors could be to have one larger bit vector
         //       and to chunk it into smaller bit vectors for each thread. Might not be any faster though.
-        crate::utils::par_for_each(self.contact_graph.active_pairs_mut(), 64, |_i, contacts| {
+        crate::utils::par_for_each(w.contact_graph.active_pairs_mut(), 64, |_i, contacts| {
             let contact_id = contacts.contact_id.0 as usize;
 
             #[cfg(not(feature = "parallel"))]
-            let status_change_bits = &mut self.contact_status_bits;
+            let status_change_bits = &mut w.contact_status_bits;
 
             // TODO: Move this out of the chunk iteration? Requires refactoring `par_for_each!`.
             #[cfg(feature = "parallel")]
             // Get the thread-local narrow phase context.
-            let mut thread_context = self
+            let mut thread_context = w
                 .thread_local_contact_status_bits
                 .get_or(|| {
                     // No thread-local bit vector exists for this thread yet.
@@ -607,24 +632,24 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                     .friction
                     .or(rb_friction1)
                     .copied()
-                    .unwrap_or(self.default_friction.0)
+                    .unwrap_or(w.default_friction.0)
                     .combine(
                         collider2
                             .friction
                             .or(rb_friction2)
                             .copied()
-                            .unwrap_or(self.default_friction.0),
+                            .unwrap_or(w.default_friction.0),
                     )
                     .dynamic_coefficient;
                 let restitution = collider1
                     .restitution
                     .copied()
-                    .unwrap_or(self.default_restitution.0)
+                    .unwrap_or(w.default_restitution.0)
                     .combine(
                         collider2
                             .restitution
                             .copied()
-                            .unwrap_or(self.default_restitution.0),
+                            .unwrap_or(w.default_restitution.0),
                     )
                     .coefficient;
 
@@ -786,9 +811,9 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
 
                 // TODO: This condition is pretty arbitrary, mainly to skip dense trimeshes.
                 //       If we let Parry handle contact matching, this wouldn't be needed.
-                if contacts.manifolds.len() <= 4 && self.config.match_contacts {
+                if contacts.manifolds.len() <= 4 && w.config.match_contacts {
                     // TODO: Cache this?
-                    let distance_threshold = 0.1 * self.length_unit.0;
+                    let distance_threshold = 0.1 * w.length_unit.0;
 
                     for manifold in contacts.manifolds.iter_mut() {
                         for previous_manifold in old_manifolds.iter() {
@@ -823,11 +848,11 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
         #[cfg(feature = "parallel")]
         {
             // Combine the thread-local bit vectors serially using bit-wise OR.
-            self.thread_local_contact_status_bits
+            w.thread_local_contact_status_bits
                 .iter_mut()
                 .for_each(|context| {
                     let contact_status_bits = context.borrow();
-                    self.contact_status_bits.or(&contact_status_bits);
+                    w.contact_status_bits.or(&contact_status_bits);
                 });
         }
     }

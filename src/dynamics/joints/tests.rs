@@ -30,7 +30,7 @@ fn create_app() -> App {
         MeshPlugin,
     ));
 
-    set_component(&mut app, SubstepCount(20));
+    app.insert_resource(SubstepCount(20));
 
     set_component(&mut app, Gravity(Vector::ZERO));
 

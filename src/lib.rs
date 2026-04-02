@@ -558,8 +558,8 @@ pub mod prelude {
         },
         spatial_query::{self, *},
         world::{
-            MainPhysicsWorld, MainPhysicsWorldEntity, PhysicsWorld, PhysicsWorldMembers,
-            PhysicsWorldOf, PhysicsWorldPlugin,
+            MainPhysicsWorld, MainPhysicsWorldEntity, PhysicsWorld, PhysicsWorldLookup,
+            PhysicsWorldPlugin,
         },
     };
 

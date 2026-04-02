@@ -187,6 +187,7 @@ pub type PhysicsTransformSet = PhysicsTransformSystems;
 pub fn transform_to_position(
     mut query: Query<(&GlobalTransform, &mut Position, &mut Rotation)>,
     worlds: Query<&PhysicsLengthUnit, With<PhysicsWorld>>,
+    main_world: Res<MainPhysicsWorldEntity>,
     last_physics_tick: Res<LastPhysicsTick>,
     system_tick: SystemChangeTick,
 ) {
@@ -200,7 +201,7 @@ pub fn transform_to_position(
     };
 
     // If the `GlobalTransform` translation and `Position` differ by less than 0.01 mm, we ignore the change.
-    let Ok(length_unit) = worlds.single() else {
+    let Ok(length_unit) = worlds.get(main_world.0) else {
         return;
     };
     let distance_tolerance = length_unit.0 * 1e-5;

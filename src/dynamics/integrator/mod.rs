@@ -257,14 +257,15 @@ impl VelocityIntegrationData {
 /// Applies gravity and locked axes to the linear and angular velocity increments of bodies.
 pub fn pre_process_velocity_increments(
     mut bodies: Query<(
+        Entity,
         &RigidBody,
         &mut VelocityIntegrationData,
         Option<&LinearDamping>,
         Option<&AngularDamping>,
         Option<&GravityScale>,
         Option<&LockedAxes>,
-        &PhysicsWorldOf,
     )>,
+    world_lookup: PhysicsWorldLookup,
     mut worlds: Query<(Entity, &Gravity, &mut SolverDiagnostics), With<PhysicsWorld>>,
     time: Res<Time<Substeps>>,
 ) {
@@ -274,10 +275,10 @@ pub fn pre_process_velocity_increments(
         let start = crate::utils::Instant::now();
 
         // TODO: Do we want to skip kinematic bodies here?
-        for (rb, mut integration, lin_damping, ang_damping, gravity_scale, locked_axes, world_of) in
+        for (entity, rb, mut integration, lin_damping, ang_damping, gravity_scale, locked_axes) in
             bodies.iter_mut()
         {
-            if world_of.world != world_entity || !rb.is_dynamic() {
+            if world_lookup.world_entity_of(entity) != world_entity || !rb.is_dynamic() {
                 continue;
             }
 
@@ -581,7 +582,7 @@ mod tests {
     #[test]
     fn semi_implicit_euler() {
         let mut app = create_app();
-        set_component(&mut app, SubstepCount(1));
+        app.insert_resource(SubstepCount(1));
         app.finish();
 
         let body_entity = app
