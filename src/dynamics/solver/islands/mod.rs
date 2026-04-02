@@ -1334,6 +1334,18 @@ impl BodyIslandNode {
         // Set the island ID for the body.
         let mut body_island = world.get_mut::<BodyIslandNode>(ctx.entity).unwrap();
         body_island.island_id = island_id;
+
+        // Cache the physics world entity for O(1) lookup.
+        if let Some(mut cached) =
+            world.get_mut::<crate::world::PhysicsWorldEntity>(ctx.entity)
+        {
+            cached.0 = world_entity;
+        } else {
+            world
+                .commands()
+                .entity(ctx.entity)
+                .insert(crate::world::PhysicsWorldEntity(world_entity));
+        }
     }
 
     // Remove the body from the island when `BodyIslandNode` is removed.
