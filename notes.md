@@ -29,7 +29,6 @@ commands.trigger(TransferToWorld {
 - Remember to also set `Transform` and zero `LinearVelocity`/`AngularVelocity` on the transferred entity
 
 ### bigspace Integration
-- `PhysicsWorld` requires `Transform` + `Visibility` for hierarchy propagation
 - `transform_to_position` composes local `Transform` values up to PhysicsWorld ancestor (f64 arithmetic) instead of reading `GlobalTransform` (f32 precision loss)
 - PhysicsWorld can live on a bigspace `Grid` entity — physics entities as children get both spatial partitioning and physics world assignment
 - Disable bevy's `TransformPlugin` when using bigspace (bigspace replaces it)
@@ -61,7 +60,7 @@ Two reference frames (nested Grids) 1 billion units apart, each with its own Phy
 
 ## Dependencies
 - `bevy_mod_debugdump` → slyedoc fork (bevy-main branch)
-- `big_space` → local path `../../../big_space` (dev-dependency for examples only)
+- `big_space` → slyedoc fork (bevy-main branch, dev-dependency for examples only)
 
 ## Testing
 ```bash

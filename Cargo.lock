@@ -1841,6 +1841,7 @@ dependencies = [
 [[package]]
 name = "big_space"
 version = "0.12.0"
+source = "git+https://github.com/slyedoc/big_space?branch=bevy-main#01f1fe271969045e2ae98e165c0ec81d86122f8d"
 dependencies = [
  "bevy_app",
  "bevy_camera",

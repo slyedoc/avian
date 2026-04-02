@@ -116,7 +116,7 @@ bevy_heavy = { git = "https://github.com/slyedoc/bevy_heavy", branch = "bevy-mai
 ] }
 criterion = { version = "0.8", features = ["html_reports"] }
 bevy_mod_debugdump = { git = "https://github.com/slyedoc/bevy_mod_debugdump", branch = "bevy-main" }
-big_space = { path = "../../../big_space", features = ["camera", "debug"] }
+big_space = { git = "https://github.com/slyedoc/big_space", branch = "bevy-main", features = ["camera", "debug"] }
 rand = "0.9"
 
 [lints]
