@@ -424,7 +424,9 @@ struct CachedIslandSleepingSystemState(
 
 /// A [`Command`] that makes the [`PhysicsIsland`](super::PhysicsIsland)s with the given IDs sleep if they are not already sleeping.
 pub struct SleepIslands {
+    /// The [`PhysicsWorld`] entity that owns these islands.
     pub world_entity: Entity,
+    /// The IDs of the islands to put to sleep.
     pub islands: Vec<IslandId>,
 }
 
@@ -548,7 +550,9 @@ impl Command for WakeBody {
 
 /// A [`Command`] that wakes up the [`PhysicsIsland`](super::PhysicsIsland)s with the given IDs if they are sleeping.
 pub struct WakeIslands {
+    /// The [`PhysicsWorld`] entity that owns these islands.
     pub world_entity: Entity,
+    /// The IDs of the islands to wake up.
     pub islands: Vec<IslandId>,
 }
 

@@ -116,6 +116,7 @@ bevy_heavy = { git = "https://github.com/slyedoc/bevy_heavy", branch = "bevy-mai
 ] }
 criterion = { version = "0.8", features = ["html_reports"] }
 bevy_mod_debugdump = { git = "https://github.com/slyedoc/bevy_mod_debugdump", branch = "bevy-main" }
+big_space = { path = "../../../big_space", features = ["camera", "debug"] }
 rand = "0.9"
 
 [lints]
@@ -159,6 +160,10 @@ required-features = ["3d", "default-collider"]
 
 [[example]]
 name = "multi_cubes"
+required-features = ["3d", "default-collider"]
+
+[[example]]
+name = "bigspace_cubes"
 required-features = ["3d", "default-collider"]
 
 [[example]]

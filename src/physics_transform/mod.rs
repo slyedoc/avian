@@ -179,15 +179,18 @@ pub enum PhysicsTransformSystems {
 #[deprecated(since = "0.4.0", note = "Renamed to `PhysicsTransformSystems`")]
 pub type PhysicsTransformSet = PhysicsTransformSystems;
 
-/// Copies [`GlobalTransform`] changes to [`Position`] and [`Rotation`].
+/// Copies transform changes to [`Position`] and [`Rotation`].
 /// This allows users to use transforms for moving and positioning bodies and colliders.
 ///
-/// To account for hierarchies, transform propagation should be run before this system.
+/// Computes position relative to the [`PhysicsWorld`] ancestor by walking up the
+/// hierarchy and composing [`Transform`]s, avoiding f32 precision loss from [`GlobalTransform`]
+/// at large distances (e.g. when using `big_space`).
 #[allow(clippy::type_complexity)]
 pub fn transform_to_position(
-    mut query: Query<(&GlobalTransform, &mut Position, &mut Rotation)>,
+    mut query: Query<(Entity, &Transform, Option<&ChildOf>, &mut Position, &mut Rotation)>,
+    ancestors: Query<(&Transform, Option<&ChildOf>, Has<PhysicsWorld>), Without<Position>>,
+    world_lookup: PhysicsWorldLookup,
     worlds: Query<&PhysicsLengthUnit, With<PhysicsWorld>>,
-    main_world: Res<MainPhysicsWorldEntity>,
     last_physics_tick: Res<LastPhysicsTick>,
     system_tick: SystemChangeTick,
 ) {
@@ -200,21 +203,23 @@ pub fn transform_to_position(
         system_tick.this_run()
     };
 
-    // If the `GlobalTransform` translation and `Position` differ by less than 0.01 mm, we ignore the change.
-    let Ok(length_unit) = worlds.get(main_world.0) else {
+    let world_entity = world_lookup.any_world_entity();
+    let Ok(length_unit) = worlds.get(world_entity) else {
         return;
     };
+    // If the translation and `Position` differ by less than 0.01 mm, we ignore the change.
     let distance_tolerance = length_unit.0 * 1e-5;
-    // If the `GlobalTransform` rotation and `Rotation` differ by less than 0.1 degrees, we ignore the change.
+    // If the rotation and `Rotation` differ by less than 0.1 degrees, we ignore the change.
     let rotation_tolerance = (0.1 as Scalar).to_radians();
 
-    for (global_transform, mut position, mut rotation) in &mut query {
-        let global_transform = global_transform.compute_transform();
-        #[cfg(feature = "2d")]
-        let transform_translation = global_transform.translation.truncate().adjust_precision();
-        #[cfg(feature = "3d")]
-        let transform_translation = global_transform.translation.adjust_precision();
-        let transform_rotation = Rotation::from(global_transform.rotation.adjust_precision());
+    for (_entity, transform, child_of, mut position, mut rotation) in &mut query {
+        // Compose transforms up the hierarchy to the PhysicsWorld ancestor,
+        // staying in f64 to preserve precision at large distances.
+        let (composed_translation, composed_rotation) =
+            compose_to_physics_world(transform, child_of, &ancestors);
+
+        let transform_translation = composed_translation;
+        let transform_rotation = Rotation::from(composed_rotation);
 
         let position_changed = !position.is_added()
             && is_changed_after_tick(
@@ -240,6 +245,66 @@ pub fn transform_to_position(
     }
 }
 
+/// Composes [`Transform`]s from the entity up to (but not including) the nearest
+/// [`PhysicsWorld`] ancestor, returning the accumulated translation and rotation.
+///
+/// This avoids reading [`GlobalTransform`] (which suffers f32 precision loss at
+/// large distances) and instead walks the hierarchy using f64 arithmetic.
+/// Composes [`Transform`]s from the entity up to (but not including) the nearest
+/// [`PhysicsWorld`] ancestor, returning the accumulated translation and rotation.
+///
+/// This avoids reading [`GlobalTransform`] (which suffers f32 precision loss at
+/// large distances) and instead walks the hierarchy composing local transforms.
+fn compose_to_physics_world(
+    entity_transform: &Transform,
+    entity_child_of: Option<&ChildOf>,
+    ancestors: &Query<(&Transform, Option<&ChildOf>, Has<PhysicsWorld>), Without<Position>>,
+) -> (Vector, Quaternion) {
+    // Start with the entity's own transform.
+    #[cfg(feature = "2d")]
+    let mut translation = entity_transform.translation.truncate().adjust_precision();
+    #[cfg(feature = "3d")]
+    let mut translation = entity_transform.translation.adjust_precision();
+    let mut rotation: Quaternion = entity_transform.rotation.adjust_precision();
+
+    // Walk up to the PhysicsWorld, composing ancestor transforms.
+    let Some(&ChildOf(mut current_parent)) = entity_child_of else {
+        return (translation, rotation);
+    };
+
+    loop {
+        let Ok((parent_transform, parent_child_of, is_physics_world)) =
+            ancestors.get(current_parent)
+        else {
+            break;
+        };
+        // Stop at the PhysicsWorld — it defines the coordinate origin.
+        if is_physics_world {
+            break;
+        }
+        // Compose: position_in_parent_space = parent_transform * child_position
+        let parent_rot: Quaternion = parent_transform.rotation.adjust_precision();
+        #[cfg(feature = "2d")]
+        let parent_translation = parent_transform.translation.truncate().adjust_precision();
+        #[cfg(feature = "3d")]
+        let parent_translation = parent_transform.translation.adjust_precision();
+        #[cfg(feature = "2d")]
+        let parent_scale = parent_transform.scale.truncate().adjust_precision();
+        #[cfg(feature = "3d")]
+        let parent_scale = parent_transform.scale.adjust_precision();
+        translation = parent_rot * (parent_scale * translation) + parent_translation;
+        rotation = parent_rot * rotation;
+
+        // Move to the next ancestor.
+        match parent_child_of {
+            Some(&ChildOf(grandparent)) => current_parent = grandparent,
+            None => break,
+        }
+    }
+
+    (translation, rotation)
+}
+
 /// Marker component indicating that the `position_to_transform` system should be applied
 /// to this entity.
 ///
@@ -261,10 +326,13 @@ type PosToTransformFilter = (
 );
 
 type ParentComponents = (
-    &'static GlobalTransform,
+    &'static Transform,
     Option<&'static Position>,
     Option<&'static Rotation>,
 );
+
+// Filter for the parents query to avoid conflict with the mutable Transform in the main query.
+type ParentFilter = (Without<RigidBody>, Without<ApplyPosToTransform>);
 
 /// Copies [`Position`] and [`Rotation`] changes to [`Transform`].
 /// This allows users and the engine to use these components for moving and positioning bodies.
@@ -274,13 +342,11 @@ type ParentComponents = (
 #[cfg(feature = "2d")]
 pub fn position_to_transform(
     mut query: Query<PosToTransformComponents, PosToTransformFilter>,
-    parents: Query<ParentComponents, With<Children>>,
+    parents: Query<ParentComponents, (With<Children>, ParentFilter)>,
 ) {
     for (mut transform, pos, rot, parent) in &mut query {
         if let Some(&ChildOf(parent)) = parent {
             if let Ok((parent_transform, parent_pos, parent_rot)) = parents.get(parent) {
-                // Compute the global transform of the parent using its Position and Rotation
-                let parent_transform = parent_transform.compute_transform();
                 let parent_pos = parent_pos.map_or(parent_transform.translation, |pos| {
                     pos.f32().extend(parent_transform.translation.z)
                 });
@@ -288,12 +354,10 @@ pub fn position_to_transform(
                     Quaternion::from(*rot).f32()
                 });
                 let parent_scale = parent_transform.scale;
-                let parent_transform = Transform::from_translation(parent_pos)
+                let parent_t = Transform::from_translation(parent_pos)
                     .with_rotation(parent_rot)
                     .with_scale(parent_scale);
 
-                // The new local transform of the child body,
-                // computed from the its global transform and its parents global transform
                 let new_transform = GlobalTransform::from(
                     Transform::from_translation(
                         pos.f32()
@@ -301,7 +365,7 @@ pub fn position_to_transform(
                     )
                     .with_rotation(Quaternion::from(*rot).f32()),
                 )
-                .reparented_to(&GlobalTransform::from(parent_transform));
+                .reparented_to(&GlobalTransform::from(parent_t));
 
                 transform.translation = new_transform.translation;
                 transform.rotation = new_transform.rotation;
@@ -321,26 +385,27 @@ pub fn position_to_transform(
 #[cfg(feature = "3d")]
 pub fn position_to_transform(
     mut query: Query<PosToTransformComponents, PosToTransformFilter>,
-    parents: Query<ParentComponents, With<Children>>,
+    parents: Query<ParentComponents, (With<Children>, ParentFilter)>,
 ) {
     for (mut transform, pos, rot, parent) in &mut query {
         if let Some(&ChildOf(parent)) = parent {
             if let Ok((parent_transform, parent_pos, parent_rot)) = parents.get(parent) {
-                // Compute the global transform of the parent using its Position and Rotation
-                let parent_transform = parent_transform.compute_transform();
-                let parent_pos = parent_pos.map_or(parent_transform.translation, |pos| pos.f32());
-                let parent_rot = parent_rot.map_or(parent_transform.rotation, |rot| rot.f32());
+                // Compute the parent's physics-space transform using Position/Rotation if available,
+                // falling back to the parent's local Transform.
+                let parent_pos =
+                    parent_pos.map_or(parent_transform.translation, |pos| pos.f32());
+                let parent_rot =
+                    parent_rot.map_or(parent_transform.rotation, |rot| rot.f32());
                 let parent_scale = parent_transform.scale;
-                let parent_transform = Transform::from_translation(parent_pos)
+                let parent_t = Transform::from_translation(parent_pos)
                     .with_rotation(parent_rot)
                     .with_scale(parent_scale);
 
-                // The new local transform of the child body,
-                // computed from the its global transform and its parents global transform
+                // Compute local transform: inverse(parent) * child_global
                 let new_transform = GlobalTransform::from(
                     Transform::from_translation(pos.f32()).with_rotation(rot.f32()),
                 )
-                .reparented_to(&GlobalTransform::from(parent_transform));
+                .reparented_to(&GlobalTransform::from(parent_t));
 
                 transform.translation = new_transform.translation;
                 transform.rotation = new_transform.rotation;
