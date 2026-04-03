@@ -68,3 +68,23 @@ cargo test -p avian3d --lib -- --skip rasterizes_compound
 cargo run -p avian3d --example multi_cubes
 cargo run -p avian3d --example bigspace_cubes
 ```
+
+## Benchmarks
+```bash
+cd benches
+cargo run --no-default-features --features 3d --release -- --list
+cargo run --no-default-features --features 3d --release -- -n "Multi-World 4x Pyramid" -t 12 -s 100 -r 3
+```
+
+Single-World N×Pyramid: N overlapping pyramids in one world (entities interact).
+Multi-World N×Pyramid: N pyramids in N isolated worlds (no cross-world interaction).
+
+### Results (i9-14900KF)
+Multi-world overhead is ~4% — isolation is essentially free.
+
+| Benchmark | 1 thread | 12 threads |
+|-----------|----------|------------|
+| Single-World 4x | 46ms | — |
+| Multi-World 4x | 48ms | — |
+| Single-World 8x | — | 91ms |
+| Multi-World 8x | — | 95ms |
