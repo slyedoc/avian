@@ -22,8 +22,20 @@ pub const BENCHMARKS: &[Benchmark] = &[
     Benchmark::new("Many Pyramids 3D", "many_pyramids", || {
         many_pyramids::create_bench(10, 10, 10)
     }),
-    // Multi-world benchmarks: same pyramid in N isolated worlds.
-    // Compare against "Large Pyramid 3D" (1 world) to measure multi-world overhead.
+    // Single-world baseline: N overlapping pyramids in one world (entities interact).
+    Benchmark::new("Single-World 1x Pyramid", "single_world", || {
+        multi_world_pyramids::create_single_world_bench(1, 50)
+    }),
+    Benchmark::new("Single-World 2x Pyramid", "single_world", || {
+        multi_world_pyramids::create_single_world_bench(2, 50)
+    }),
+    Benchmark::new("Single-World 4x Pyramid", "single_world", || {
+        multi_world_pyramids::create_single_world_bench(4, 50)
+    }),
+    Benchmark::new("Single-World 8x Pyramid", "single_world", || {
+        multi_world_pyramids::create_single_world_bench(8, 50)
+    }),
+    // Multi-world: same pyramid in N isolated worlds (no cross-world interaction).
     Benchmark::new("Multi-World 1x Pyramid", "multi_world", || {
         multi_world_pyramids::create_bench(1, 50)
     }),

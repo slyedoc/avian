@@ -9,6 +9,24 @@ use bevy::prelude::*;
 
 use super::Benchmark3dPlugins;
 
+/// Creates a single-world baseline benchmark with `pyramid_count` overlapping pyramids.
+/// All pyramids share the same world, so entities interact (more broad/narrow phase work).
+pub fn create_single_world_bench(pyramid_count: usize, base_count: usize) -> App {
+    let mut app = App::new();
+    app.add_plugins((Benchmark3dPlugins, PhysicsPlugins::default()));
+    super::set_component(&mut app, SubstepCount(4));
+    app.add_systems(Startup, move |commands: Commands| {
+        setup_single_world(commands, pyramid_count, base_count)
+    });
+    app
+}
+
+fn setup_single_world(mut commands: Commands, pyramid_count: usize, base_count: usize) {
+    for _ in 0..pyramid_count {
+        spawn_pyramid(&mut commands, None, base_count);
+    }
+}
+
 /// Creates a benchmark with `world_count` physics worlds, each containing
 /// a pyramid with the given `base_count`.
 pub fn create_bench(world_count: usize, base_count: usize) -> App {
