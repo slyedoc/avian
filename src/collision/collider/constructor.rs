@@ -11,7 +11,7 @@ use itertools::Either;
 ///
 /// In contrast to [`ColliderConstructor`], this component will *not* generate a collider on its own entity.
 ///
-/// If this component is used on a scene, such as one spawned by a [`SceneRoot`], it will
+/// If this component is used on a scene, such as one spawned by a [`WorldAssetRoot`], it will
 /// wait until the scene is loaded before generating colliders. Note that this requires
 /// the `bevy_scene` feature to be enabled.
 ///
@@ -51,7 +51,7 @@ use itertools::Either;
     doc = "    // Spawn the scene and automatically generate triangle mesh colliders"
 )]
 ///     commands.spawn((
-///         SceneRoot(scene.clone()),
+///         WorldAssetRoot(scene.clone()),
 #[cfg_attr(
     feature = "2d",
     doc = "        ColliderConstructorHierarchy::new(ColliderConstructor::Circle { radius: 2.0 }),"
@@ -64,7 +64,7 @@ use itertools::Either;
 ///
 ///     // Specify configuration for specific meshes by name
 ///     commands.spawn((
-///         SceneRoot(scene.clone()),
+///         WorldAssetRoot(scene.clone()),
 #[cfg_attr(
     feature = "2d",
     doc = "        ColliderConstructorHierarchy::new(ColliderConstructor::Circle { radius: 2.0 })
@@ -81,7 +81,7 @@ use itertools::Either;
 ///
 ///     // Only generate colliders for specific meshes by name
 ///     commands.spawn((
-///         SceneRoot(scene.clone()),
+///         WorldAssetRoot(scene.clone()),
 ///         ColliderConstructorHierarchy::new(None)
 #[cfg_attr(
     feature = "2d",
@@ -95,7 +95,7 @@ use itertools::Either;
 ///
 ///     // Generate colliders for everything except specific meshes by name
 ///     commands.spawn((
-///         SceneRoot(scene),
+///         WorldAssetRoot(scene),
 #[cfg_attr(
     feature = "2d",
     doc = "        ColliderConstructorHierarchy::new(ColliderConstructor::Circle { radius: 2.0 })
@@ -772,7 +772,7 @@ mod tests {
         let hierarchy = app
             .world_mut()
             .spawn((
-                SceneRoot(scene_handle),
+                WorldAssetRoot(scene_handle),
                 ColliderConstructorHierarchy::new(ColliderConstructor::ConvexDecompositionFromMesh)
                     // Use a primitive collider for the left arm.
                     .with_constructor_for_name("armL_mesh.ferris_material", PRIMITIVE_COLLIDER)
