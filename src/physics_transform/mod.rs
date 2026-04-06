@@ -285,14 +285,18 @@ fn compose_to_physics_world(
         // Compose: position_in_parent_space = parent_transform * child_position
         let parent_rot: Quaternion = parent_transform.rotation.adjust_precision();
         #[cfg(feature = "2d")]
-        let parent_translation = parent_transform.translation.truncate().adjust_precision();
+        {
+            let parent_translation = parent_transform.translation.truncate().adjust_precision();
+            let parent_scale = parent_transform.scale.truncate().adjust_precision();
+            translation = (parent_rot * (parent_scale * translation).extend(0.0)).truncate()
+                + parent_translation;
+        }
         #[cfg(feature = "3d")]
-        let parent_translation = parent_transform.translation.adjust_precision();
-        #[cfg(feature = "2d")]
-        let parent_scale = parent_transform.scale.truncate().adjust_precision();
-        #[cfg(feature = "3d")]
-        let parent_scale = parent_transform.scale.adjust_precision();
-        translation = parent_rot * (parent_scale * translation) + parent_translation;
+        {
+            let parent_translation = parent_transform.translation.adjust_precision();
+            let parent_scale = parent_transform.scale.adjust_precision();
+            translation = parent_rot * (parent_scale * translation) + parent_translation;
+        }
         rotation = parent_rot * rotation;
 
         // Move to the next ancestor.
