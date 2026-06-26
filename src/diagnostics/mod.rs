@@ -81,13 +81,12 @@ pub use total::{PhysicsTotalDiagnostics, PhysicsTotalDiagnosticsPlugin};
 use crate::{PhysicsStepSystems, schedule::PhysicsSchedule};
 use bevy::{
     diagnostic::DiagnosticPath,
-    ecs::component::Mutable,
-    prelude::{App, IntoScheduleConfigs, ResMut, Resource, SystemSet},
+    prelude::{App, Component, IntoScheduleConfigs, Single, SystemSet, With},
 };
 #[cfg(feature = "bevy_diagnostic")]
 use bevy::{
     diagnostic::{Diagnostic, Diagnostics, RegisterDiagnostic},
-    prelude::{Plugin, Res},
+    prelude::Plugin,
 };
 use core::time::Duration;
 
@@ -128,7 +127,7 @@ pub enum PhysicsDiagnosticsSystems {
 }
 
 /// A trait for resources storing timers and counters for [physics diagnostics](crate::diagnostics).
-pub trait PhysicsDiagnostics: Default + Resource<Mutability = Mutable> {
+pub trait PhysicsDiagnostics: Default + Component<Mutability = bevy::ecs::component::Mutable> {
     /// Maps diagnostic paths to their respective duration fields.
     fn timer_paths(&self) -> Vec<(&'static DiagnosticPath, Duration)> {
         Vec::new()
@@ -140,13 +139,13 @@ pub trait PhysicsDiagnostics: Default + Resource<Mutability = Mutable> {
     }
 
     /// A system that resets the diagnostics to their default values.
-    fn reset(mut physics_diagnostics: ResMut<Self>) {
-        *physics_diagnostics = Self::default();
+    fn reset(mut physics_diagnostics: Single<&mut Self>) {
+        **physics_diagnostics = Self::default();
     }
 
     /// A system that writes diagnostics to the given [`Diagnostics`] instance.
     #[cfg(feature = "bevy_diagnostic")]
-    fn write_diagnostics(physics_diagnostics: Res<Self>, mut diagnostics: Diagnostics) {
+    fn write_diagnostics(physics_diagnostics: Single<&Self>, mut diagnostics: Diagnostics) {
         for (path, duration) in physics_diagnostics.timer_paths() {
             diagnostics.add_measurement(path, || duration.as_secs_f64() * 1000.0);
         }
@@ -169,12 +168,17 @@ pub trait AppDiagnosticsExt {
 impl AppDiagnosticsExt for App {
     fn register_physics_diagnostics<T: PhysicsDiagnostics>(&mut self) {
         // Avoid duplicate registrations.
-        if self.world().is_resource_added::<T>() {
+        let world = self.world_mut();
+        let has_diagnostics = world
+            .query_filtered::<(), With<T>>()
+            .iter(world)
+            .next()
+            .is_some();
+        if has_diagnostics {
             return;
         }
 
-        // Initialize the diagnostics resource.
-        self.init_resource::<T>();
+        // Diagnostics components are on the PhysicsWorld entity.
 
         // Make sure the system set exists, even if `PhysicsDiagnosticsPlugin` is not added.
         self.configure_sets(

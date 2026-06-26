@@ -87,17 +87,18 @@ impl SolverPlugin {
 
 impl Plugin for SolverPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<SolverConfig>()
-            .init_resource::<ContactSoftnessCoefficients>()
-            .init_resource::<ContactConstraints>()
-            .init_resource::<ConstraintGraph>();
+        // ContactConstraints and ConstraintGraph are on the PhysicsWorld entity.
 
-        if app
-            .world()
-            .get_resource::<PhysicsLengthUnit>()
-            .is_none_or(|unit| unit.0 == 1.0)
-        {
-            app.insert_resource(PhysicsLengthUnit(self.length_unit));
+        // Update the PhysicsLengthUnit on the MainPhysicsWorld entity.
+        if self.length_unit != 1.0 {
+            let world = app.world_mut();
+            let entity = world
+                .query_filtered::<Entity, With<PhysicsLengthUnit>>()
+                .single(world)
+                .unwrap();
+            world
+                .entity_mut(entity)
+                .insert(PhysicsLengthUnit(self.length_unit));
         }
 
         // Get the `PhysicsSchedule`, and panic if it doesn't exist.
@@ -196,8 +197,8 @@ impl Plugin for SolverPlugin {
 /// # #[cfg(not(feature = "2d"))]
 /// # fn main() {} // Doc test needs main
 /// ```
-#[derive(Resource, Clone, Debug, Deref, DerefMut, PartialEq, Reflect)]
-#[reflect(Resource)]
+#[derive(Component, Clone, Debug, Deref, DerefMut, PartialEq, Reflect)]
+#[reflect(Component)]
 pub struct PhysicsLengthUnit(pub Scalar);
 
 impl Default for PhysicsLengthUnit {
@@ -211,8 +212,8 @@ impl Default for PhysicsLengthUnit {
 ///
 /// These are tuned to give good results for most applications, but can
 /// be configured if more control over the simulation behavior is needed.
-#[derive(Resource, Clone, Debug, PartialEq, Reflect)]
-#[reflect(Resource)]
+#[derive(Component, Clone, Debug, PartialEq, Reflect)]
+#[reflect(Component)]
 pub struct SolverConfig {
     /// The damping ratio used for contact stabilization.
     ///
@@ -305,8 +306,8 @@ impl Default for SolverConfig {
 ///
 /// **Note**: This resource is updated automatically and not intended to be modified manually.
 /// Use the [`SolverConfig`] resource instead for tuning contact behavior.
-#[derive(Resource, Clone, Copy, PartialEq, Reflect)]
-#[reflect(Resource)]
+#[derive(Component, Clone, Copy, PartialEq, Reflect)]
+#[reflect(Component)]
 pub struct ContactSoftnessCoefficients {
     /// The [`SoftnessCoefficients`] used for contacts against dynamic bodies.
     pub dynamic: SoftnessCoefficients,
@@ -324,11 +325,11 @@ impl Default for ContactSoftnessCoefficients {
 }
 
 fn update_contact_softness(
-    mut coefficients: ResMut<ContactSoftnessCoefficients>,
-    solver_config: Res<SolverConfig>,
+    solver_query: Single<(Ref<SolverConfig>, &mut ContactSoftnessCoefficients)>,
     physics_time: Res<Time<Physics>>,
     substep_time: Res<Time<Substeps>>,
 ) {
+    let (solver_config, mut coefficients) = solver_query.into_inner();
     if solver_config.is_changed() || physics_time.is_changed() || substep_time.is_changed() {
         let dt = physics_time.delta_secs_f64() as Scalar;
         let h = substep_time.delta_secs_f64() as Scalar;
@@ -350,7 +351,7 @@ fn update_contact_softness(
 }
 
 /// A resource that stores the contact constraints.
-#[derive(Resource, Default, Deref, DerefMut)]
+#[derive(Component, Default, Deref, DerefMut)]
 pub struct ContactConstraints(pub Vec<ContactConstraint>);
 
 #[derive(QueryData)]
@@ -361,12 +362,12 @@ pub(super) struct BodyQuery {
 }
 
 fn prepare_contact_constraints(
-    contact_graph: Res<ContactGraph>,
-    mut constraint_graph: ResMut<ConstraintGraph>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    contact_graph: Single<&ContactGraph>,
+    mut constraint_graph: Single<&mut ConstraintGraph>,
+    mut diagnostics: Single<&mut SolverDiagnostics>,
     bodies: Query<BodyQuery, RigidBodyActiveFilter>,
-    narrow_phase_config: Res<NarrowPhaseConfig>,
-    contact_softness: Res<ContactSoftnessCoefficients>,
+    narrow_phase_config: Single<&NarrowPhaseConfig>,
+    contact_softness: Single<&ContactSoftnessCoefficients>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -452,9 +453,9 @@ fn prepare_contact_constraints(
 /// See [`SubstepSolverSystems::WarmStart`] for more information.
 fn warm_start(
     bodies: Query<(&mut SolverBody, &SolverBodyInertia)>,
-    mut constraint_graph: ResMut<ConstraintGraph>,
-    solver_config: Res<SolverConfig>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut constraint_graph: Single<&mut ConstraintGraph>,
+    solver_config: Single<&SolverConfig>,
+    mut diagnostics: Single<&mut SolverDiagnostics>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -530,11 +531,11 @@ fn warm_start_internal(
 #[allow(clippy::type_complexity)]
 fn solve_contacts<const USE_BIAS: bool>(
     bodies: Query<(&mut SolverBody, &SolverBodyInertia)>,
-    mut constraint_graph: ResMut<ConstraintGraph>,
-    solver_config: Res<SolverConfig>,
-    length_unit: Res<PhysicsLengthUnit>,
+    mut constraint_graph: Single<&mut ConstraintGraph>,
+    solver_config: Single<&SolverConfig>,
+    length_unit: Single<&PhysicsLengthUnit>,
     time: Res<Time>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut diagnostics: Single<&mut SolverDiagnostics>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -629,10 +630,10 @@ fn solve_contacts_internal<const USE_BIAS: bool>(
 #[allow(clippy::type_complexity)]
 fn solve_restitution(
     bodies: Query<(&mut SolverBody, &SolverBodyInertia)>,
-    mut constraint_graph: ResMut<ConstraintGraph>,
-    solver_config: Res<SolverConfig>,
-    length_unit: Res<PhysicsLengthUnit>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut constraint_graph: Single<&mut ConstraintGraph>,
+    solver_config: Single<&SolverConfig>,
+    length_unit: Single<&PhysicsLengthUnit>,
+    mut diagnostics: Single<&mut SolverDiagnostics>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -720,9 +721,9 @@ fn solve_restitution_internal(
 /// Copies contact impulses from [`ContactConstraints`] to the contacts in the [`ContactGraph`].
 /// They will be used for [warm starting](SubstepSolverSystems::WarmStart).
 fn store_contact_impulses(
-    mut contact_graph: ResMut<ContactGraph>,
-    mut constraint_graph: ResMut<ConstraintGraph>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut contact_graph: Single<&mut ContactGraph>,
+    mut constraint_graph: Single<&mut ConstraintGraph>,
+    mut diagnostics: Single<&mut SolverDiagnostics>,
 ) {
     let start = crate::utils::Instant::now();
 

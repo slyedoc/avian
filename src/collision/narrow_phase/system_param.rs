@@ -75,17 +75,17 @@ pub struct NarrowPhase<'w, 's, C: AnyCollider> {
     body_query: Query<'w, 's, RigidBodyQuery, Without<RigidBodyDisabled>>,
     body_islands:
         Query<'w, 's, &'static mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
-    pub contact_graph: ResMut<'w, ContactGraph>,
-    pub joint_graph: ResMut<'w, JointGraph>,
-    pub constraint_graph: ResMut<'w, ConstraintGraph>,
-    pub islands: Option<ResMut<'w, PhysicsIslands>>,
-    contact_status_bits: ResMut<'w, ContactStatusBits>,
+    pub contact_graph: Single<'w, 's, &'static mut ContactGraph>,
+    pub joint_graph: Single<'w, 's, &'static mut JointGraph>,
+    pub constraint_graph: Single<'w, 's, &'static mut ConstraintGraph>,
+    pub islands: Query<'w, 's, &'static mut PhysicsIslands>,
+    contact_status_bits: Single<'w, 's, &'static mut ContactStatusBits>,
     #[cfg(feature = "parallel")]
-    thread_local_contact_status_bits: ResMut<'w, ThreadLocalContactStatusBits>,
-    pub config: Res<'w, NarrowPhaseConfig>,
-    default_friction: Res<'w, DefaultFriction>,
-    default_restitution: Res<'w, DefaultRestitution>,
-    length_unit: Res<'w, PhysicsLengthUnit>,
+    thread_local_contact_status_bits: Single<'w, 's, &'static mut ThreadLocalContactStatusBits>,
+    pub config: Single<'w, 's, Ref<'static, NarrowPhaseConfig>>,
+    default_friction: Single<'w, 's, &'static DefaultFriction>,
+    default_restitution: Single<'w, 's, &'static DefaultRestitution>,
+    length_unit: Single<'w, 's, &'static PhysicsLengthUnit>,
     // These are scaled by the length unit.
     default_speculative_margin: Local<'s, Scalar>,
     contact_tolerance: Local<'s, Scalar>,
@@ -93,8 +93,8 @@ pub struct NarrowPhase<'w, 's, C: AnyCollider> {
 
 /// A bit vector for tracking contact status changes.
 /// Set bits correspond to contact pairs that were either added or removed.
-#[derive(Resource, Default, Deref, DerefMut)]
-pub(super) struct ContactStatusBits(pub BitVec);
+#[derive(Component, Default, Deref, DerefMut)]
+pub(crate) struct ContactStatusBits(pub BitVec);
 
 // TODO: We could just combine all the bit vectors into the first one
 //       instead of having a separate `ContactStatusBits` resource.
@@ -103,8 +103,8 @@ pub(super) struct ContactStatusBits(pub BitVec);
 ///
 /// The thread-local bit vectors are combined with the global [`ContactStatusBits`].
 #[cfg(feature = "parallel")]
-#[derive(Resource, Default, Deref, DerefMut)]
-pub(super) struct ThreadLocalContactStatusBits(pub ThreadLocal<RefCell<BitVec>>);
+#[derive(Component, Default, Deref, DerefMut)]
+pub(crate) struct ThreadLocalContactStatusBits(pub ThreadLocal<RefCell<BitVec>>);
 
 impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
     /// Updates the narrow phase.
@@ -197,7 +197,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                         }
 
                         // Unlink the contact pair from its island.
-                        if has_island && let Some(islands) = &mut self.islands {
+                        if has_island && let Ok(mut islands) = self.islands.single_mut() {
                             islands.remove_contact(
                                 contact_id,
                                 &mut self.body_islands,
@@ -245,7 +245,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                         }
 
                         // Link the contact pair to an island.
-                        if let Some(islands) = &mut self.islands {
+                        if let Ok(mut islands) = self.islands.single_mut() {
                             let island = islands.add_contact(
                                 contact_id,
                                 &mut self.body_islands,
@@ -307,7 +307,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                         }
 
                         // Unlink the contact pair from its island.
-                        if let Some(islands) = &mut self.islands {
+                        if let Ok(mut islands) = self.islands.single_mut() {
                             let island = islands.remove_contact(
                                 contact_id,
                                 &mut self.body_islands,
@@ -339,7 +339,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                     }
 
                     // Link the contact pair to an island.
-                    if let Some(islands) = &mut self.islands {
+                    if let Ok(mut islands) = self.islands.single_mut() {
                         let island = islands.add_contact(
                             contact_id,
                             &mut self.body_islands,

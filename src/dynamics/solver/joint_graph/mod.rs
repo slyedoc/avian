@@ -22,7 +22,7 @@ use bevy::prelude::*;
 ///
 /// [rigid bodies]: crate::dynamics::RigidBody
 /// [joints]: crate::dynamics::joints
-#[derive(Resource, Clone, Debug, Default)]
+#[derive(Component, Clone, Debug, Default)]
 pub struct JointGraph {
     graph: StableUnGraph<Entity, JointGraphEdge>,
     entity_to_body: SparseSecondaryEntityMap<NodeIndex>,

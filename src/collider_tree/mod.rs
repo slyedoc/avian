@@ -21,13 +21,13 @@
 //! [`SpatialQuery`]: crate::spatial_query::SpatialQuery
 //! [`BvhBroadPhasePlugin`]: crate::collision::broad_phase::BvhBroadPhasePlugin
 
-mod diagnostics;
+pub(crate) mod diagnostics;
 mod obvhs_ext;
-mod optimization;
+pub(crate) mod optimization;
 mod proxy_key;
 mod traverse;
 mod tree;
-mod update;
+pub(crate) mod update;
 
 pub use diagnostics::ColliderTreeDiagnostics;
 pub use obvhs_ext::Bvh2Ext;
@@ -35,7 +35,7 @@ pub(crate) use obvhs_ext::obvhs_ray;
 pub use optimization::{ColliderTreeOptimization, TreeOptimizationMode};
 pub use proxy_key::{ColliderTreeProxyKey, ColliderTreeType, ProxyId};
 pub use tree::{ColliderTree, ColliderTreeProxy, ColliderTreeProxyFlags, ColliderTreeWorkspace};
-pub use update::{MovedProxies, update_moved_collider_aabbs};
+pub use update::{EnlargedProxies, MovedProxies, update_moved_collider_aabbs};
 
 use optimization::ColliderTreeOptimizationPlugin;
 use update::ColliderTreeUpdatePlugin;
@@ -71,8 +71,7 @@ impl<C: AnyCollider> Plugin for ColliderTreePlugin<C> {
         }
 
         // Initialize resources.
-        app.init_resource::<ColliderTrees>()
-            .init_resource::<MovedProxies>();
+        // ColliderTrees and MovedProxies are on the PhysicsWorld entity.
 
         // Configure system sets.
         app.configure_sets(
@@ -117,7 +116,7 @@ pub enum ColliderTreeSystems {
 /// Trees for accelerating queries on a set of colliders.
 ///
 /// See the [`collider_tree`](crate::collider_tree) module for more information.
-#[derive(Resource, Default, Clone)]
+#[derive(Component, Default, Clone)]
 pub struct ColliderTrees {
     /// A tree for the colliders of dynamic bodies.
     pub dynamic_tree: ColliderTree,

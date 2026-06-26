@@ -21,8 +21,8 @@ impl Plugin for PhysicsEntityDiagnosticsPlugin {
 }
 
 /// Diagnostics for physics entity counts.
-#[derive(Resource, Debug, Default, Reflect)]
-#[reflect(Resource, Debug)]
+#[derive(Component, Debug, Default, Reflect)]
+#[reflect(Component, Debug)]
 pub struct PhysicsEntityDiagnostics {
     /// The number of dynamic bodies.
     pub dynamic_body_count: u32,
@@ -67,7 +67,7 @@ fn diagnostic_entity_counts(
     distance_joint_query: Query<&DistanceJoint>,
     revolute_joint_query: Query<&RevoluteJoint>,
     #[cfg(feature = "3d")] spherical_joint_query: Query<&SphericalJoint>,
-    mut diagnostics: ResMut<PhysicsEntityDiagnostics>,
+    mut diagnostics: Single<&mut PhysicsEntityDiagnostics>,
 ) {
     diagnostics.dynamic_body_count = rigid_bodies_query
         .iter()

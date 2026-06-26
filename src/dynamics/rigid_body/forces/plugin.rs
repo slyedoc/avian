@@ -209,7 +209,7 @@ fn apply_local_acceleration(
         (&mut SolverBody, &AccumulatedLocalAcceleration, &Rotation),
         Without<CustomVelocityIntegration>,
     >,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut diagnostics: Single<&mut SolverDiagnostics>,
     time: Res<Time<Substeps>>,
 ) {
     let start = crate::utils::Instant::now();

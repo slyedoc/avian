@@ -49,13 +49,13 @@ where
 }
 
 fn collect_collision_pairs<H: CollisionHooks>(
-    trees: ResMut<ColliderTrees>,
-    moved_proxies: Res<MovedProxies>,
+    trees: Single<&mut ColliderTrees>,
+    moved_proxies: Single<&MovedProxies>,
     hooks: StaticSystemParam<H>,
     par_commands: ParallelCommands,
-    mut contact_graph: ResMut<ContactGraph>,
-    joint_graph: Res<JointGraph>,
-    mut diagnostics: ResMut<CollisionDiagnostics>,
+    mut contact_graph: Single<&mut ContactGraph>,
+    joint_graph: Single<&JointGraph>,
+    mut diagnostics: Single<&mut CollisionDiagnostics>,
 ) where
     for<'w, 's> SystemParamItem<'w, 's, H>: CollisionHooks,
 {

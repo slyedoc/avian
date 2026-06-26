@@ -5,6 +5,7 @@
 use bevy::{
     app::{App, Plugin},
     ecs::{
+        component::Component,
         entity::Entity,
         entity_disabling::Disabled,
         error::Result,
@@ -12,13 +13,11 @@ use bevy::{
         observer::On,
         query::{Changed, Has, Or, With, Without},
         resource::Resource,
-        schedule::{
-            IntoScheduleConfigs,
-            common_conditions::{resource_changed, resource_exists},
-        },
+        schedule::IntoScheduleConfigs,
         system::{
-            Command, Commands, Local, ParamSet, Query, Res, ResMut, SystemChangeTick, SystemState,
-            lifetimeless::{SQuery, SResMut},
+            Command, Commands, Local, ParamSet, Query, Res, Single, SystemChangeTick,
+            SystemState,
+            lifetimeless::SQuery,
         },
         world::{DeferredWorld, Mut, Ref, World},
     },
@@ -43,8 +42,8 @@ pub struct IslandSleepingPlugin;
 
 impl Plugin for IslandSleepingPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<AwakeIslandBitVec>();
-        app.init_resource::<TimeToSleep>();
+        // AwakeIslandBitVec is on the PhysicsWorld entity.
+        // TimeToSleep is on the PhysicsWorld entity.
 
         // Insert `SleepThreshold` and `SleepTimer` for each `SolverBody`.
         app.register_required_components::<SolverBody, SleepThreshold>();
@@ -74,11 +73,11 @@ impl Plugin for IslandSleepingPlugin {
                 update_sleeping_states,
                 wake_islands_with_sleeping_disabled,
                 wake_on_changed,
-                wake_all_islands.run_if(resource_changed::<Gravity>),
+                wake_all_islands.run_if(|q: Query<(), Changed<Gravity>>| !q.is_empty()),
                 sleep_islands,
             )
                 .chain()
-                .run_if(resource_exists::<PhysicsIslands>)
+                .run_if(|q: Query<(), With<PhysicsIslands>>| !q.is_empty())
                 .in_set(PhysicsStepSystems::Sleeping),
         );
     }
@@ -92,8 +91,9 @@ fn sleep_on_add_sleeping(mut world: DeferredWorld, ctx: HookContext) {
     let island_id = body_island.island_id;
 
     // Check if the island is already sleeping.
+    let world_entity = world.resource::<MainPhysicsWorldEntity>().0;
     if let Some(island) = world
-        .get_resource::<PhysicsIslands>()
+        .get::<PhysicsIslands>(world_entity)
         .and_then(|islands| islands.get(island_id))
         && island.is_sleeping
     {
@@ -111,8 +111,9 @@ fn wake_on_remove_sleeping(mut world: DeferredWorld, ctx: HookContext) {
     let island_id = body_island.island_id;
 
     // Check if the island is already awake.
+    let world_entity = world.resource::<MainPhysicsWorldEntity>().0;
     if let Some(island) = world
-        .get_resource::<PhysicsIslands>()
+        .get::<PhysicsIslands>(world_entity)
         .and_then(|islands| islands.get(island_id))
         && !island.is_sleeping
     {
@@ -158,11 +159,11 @@ fn wake_on_enable_rigid_body(
 }
 
 /// A bit vector that stores which islands are kept awake and which are allowed to sleep.
-#[derive(Resource, Default, Deref, DerefMut)]
+#[derive(Component, Default, Deref, DerefMut)]
 pub(crate) struct AwakeIslandBitVec(pub(crate) BitVec);
 
 fn wake_islands_with_sleeping_disabled(
-    mut awake_island_bit_vec: ResMut<AwakeIslandBitVec>,
+    mut awake_island_bit_vec: Single<&mut AwakeIslandBitVec>,
     mut query: Query<
         (&BodyIslandNode, &mut SleepTimer),
         Or<(
@@ -182,8 +183,8 @@ fn wake_islands_with_sleeping_disabled(
 }
 
 fn update_sleeping_states(
-    mut awake_island_bit_vec: ResMut<AwakeIslandBitVec>,
-    mut islands: ResMut<PhysicsIslands>,
+    mut awake_island_bit_vec: Single<&mut AwakeIslandBitVec>,
+    mut islands: Single<&mut PhysicsIslands>,
     mut query: Query<
         (
             &mut SleepTimer,
@@ -193,8 +194,8 @@ fn update_sleeping_states(
         ),
         (Without<Sleeping>, Without<SleepingDisabled>),
     >,
-    length_unit: Res<PhysicsLengthUnit>,
-    time_to_sleep: Res<TimeToSleep>,
+    length_unit: Single<&PhysicsLengthUnit>,
+    time_to_sleep: Single<&TimeToSleep>,
     time: Res<Time>,
 ) {
     let length_unit_squared = length_unit.0 * length_unit.0;
@@ -241,8 +242,8 @@ fn update_sleeping_states(
 }
 
 fn sleep_islands(
-    mut awake_island_bit_vec: ResMut<AwakeIslandBitVec>,
-    mut islands: ResMut<PhysicsIslands>,
+    mut awake_island_bit_vec: Single<&mut AwakeIslandBitVec>,
+    mut islands: Single<&mut PhysicsIslands>,
     mut commands: Commands,
     mut sleep_buffer: Local<Vec<IslandId>>,
     mut wake_buffer: Local<Vec<IslandId>>,
@@ -284,9 +285,9 @@ struct CachedBodySleepingSystemState(
     SystemState<(
         SQuery<&'static mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
         SQuery<&'static RigidBodyColliders>,
-        SResMut<PhysicsIslands>,
-        SResMut<ContactGraph>,
-        SResMut<JointGraph>,
+        SQuery<&'static mut PhysicsIslands>,
+        SQuery<&'static mut ContactGraph>,
+        SQuery<&'static mut JointGraph>,
     )>,
 );
 
@@ -302,10 +303,13 @@ impl Command for SleepBody {
                     let (
                         mut body_islands,
                         body_colliders,
-                        mut islands,
-                        mut contact_graph,
-                        mut joint_graph,
-                    ) = state.0.get_mut(world).unwrap();
+                        mut islands_query,
+                        mut contact_graph_query,
+                        mut joint_graph_query,
+                    ) = state.0.get_mut(world).expect("Failed to get system state");
+                    let mut islands = islands_query.single_mut().unwrap();
+                    let mut contact_graph = contact_graph_query.single_mut().unwrap();
+                    let mut joint_graph = joint_graph_query.single_mut().unwrap();
 
                     let Some(island) = islands.get_mut(island_id) else {
                         return;
@@ -352,9 +356,9 @@ struct CachedIslandSleepingSystemState(
             &'static mut SleepTimer,
             Option<&'static RigidBodyColliders>,
         )>,
-        SResMut<PhysicsIslands>,
-        SResMut<ContactGraph>,
-        SResMut<ConstraintGraph>,
+        SQuery<&'static mut PhysicsIslands>,
+        SQuery<&'static mut ContactGraph>,
+        SQuery<&'static mut ConstraintGraph>,
     )>,
 );
 
@@ -365,8 +369,11 @@ impl Command for SleepIslands {
     type Out = ();
     fn apply(self, world: &mut World) {
         world.try_resource_scope(|world, mut state: Mut<CachedIslandSleepingSystemState>| {
-            let (bodies, mut islands, mut contact_graph, mut constraint_graph) =
-                state.0.get_mut(world).unwrap();
+            let (bodies, mut islands_query, mut contact_graph_query, mut constraint_graph_query) =
+                state.0.get_mut(world).expect("Failed to get system state");
+            let mut islands = islands_query.single_mut().unwrap();
+            let mut contact_graph = contact_graph_query.single_mut().unwrap();
+            let mut constraint_graph = constraint_graph_query.single_mut().unwrap();
 
             let mut bodies_to_sleep = Vec::<(Entity, Sleeping)>::new();
 
@@ -441,9 +448,9 @@ struct CachedIslandWakingSystemState(
             &'static mut SleepTimer,
             Option<&'static RigidBodyColliders>,
         )>,
-        SResMut<PhysicsIslands>,
-        SResMut<ContactGraph>,
-        SResMut<ConstraintGraph>,
+        SQuery<&'static mut PhysicsIslands>,
+        SQuery<&'static mut ContactGraph>,
+        SQuery<&'static mut ConstraintGraph>,
     )>,
 );
 
@@ -477,8 +484,11 @@ impl Command for WakeIslands {
     type Out = ();
     fn apply(self, world: &mut World) {
         world.try_resource_scope(|world, mut state: Mut<CachedIslandWakingSystemState>| {
-            let (mut bodies, mut islands, mut contact_graph, mut constraint_graph) =
-                state.0.get_mut(world).unwrap();
+            let (mut bodies, mut islands_query, mut contact_graph_query, mut constraint_graph_query) =
+                state.0.get_mut(world).expect("Failed to get system state");
+            let mut islands = islands_query.single_mut().unwrap();
+            let mut contact_graph = contact_graph_query.single_mut().unwrap();
+            let mut constraint_graph = constraint_graph_query.single_mut().unwrap();
 
             let mut bodies_to_wake = Vec::<Entity>::new();
 
@@ -591,7 +601,7 @@ fn wake_on_changed(
         // and don't need special handling.
         Query<&BodyIslandNode, Or<(ConstantForceChanges, Changed<GravityScale>)>>,
     )>,
-    mut awake_island_bit_vec: ResMut<AwakeIslandBitVec>,
+    mut awake_island_bit_vec: Single<&mut AwakeIslandBitVec>,
     last_physics_tick: Res<LastPhysicsTick>,
     system_tick: SystemChangeTick,
 ) {
@@ -614,7 +624,7 @@ fn wake_on_changed(
 }
 
 /// Wakes up all sleeping [`PhysicsIsland`](super::PhysicsIsland)s. Triggered automatically when [`Gravity`] is changed.
-fn wake_all_islands(mut commands: Commands, islands: Res<PhysicsIslands>) {
+fn wake_all_islands(mut commands: Commands, islands: Single<&PhysicsIslands>) {
     let sleeping_islands: Vec<IslandId> = islands
         .iter()
         .filter_map(|island| island.is_sleeping.then_some(island.id))

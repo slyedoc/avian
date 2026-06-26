@@ -21,7 +21,7 @@
 #[cfg(feature = "serialize")]
 use bevy::reflect::{ReflectDeserialize, ReflectSerialize};
 use bevy::{
-    ecs::{entity::Entity, resource::Resource},
+    ecs::{component::Component, entity::Entity},
     reflect::Reflect,
 };
 
@@ -122,7 +122,7 @@ pub struct ContactConstraintHandle {
 /// See the [module-level documentation](self) for more general information about graph coloring.
 ///
 /// [`ContactManifold`]: crate::collision::contact_types::ContactManifold
-#[derive(Resource, Clone, Debug, Reflect)]
+#[derive(Component, Clone, Debug, Reflect)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
 #[reflect(Debug)]

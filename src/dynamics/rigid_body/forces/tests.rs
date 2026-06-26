@@ -9,6 +9,8 @@ use crate::prelude::*;
 
 const TIMESTEP: f32 = 1.0 / 64.0;
 
+use crate::set_main_world_component as set_component;
+
 fn create_app() -> App {
     let mut app = App::new();
     app.add_plugins((
@@ -23,10 +25,10 @@ fn create_app() -> App {
     ));
 
     // Use 20 substeps.
-    app.insert_resource(SubstepCount(20));
+    set_component(&mut app, SubstepCount(20));
 
-    // Use a gravity of 9.81 m/s².
-    app.insert_resource(Gravity(Vector::NEG_Y * 9.81));
+    // Set gravity to 9.81 m/s².
+    set_component(&mut app, Gravity(Vector::NEG_Y * 9.81));
 
     // Configure the timestep.
     app.insert_resource(Time::<Fixed>::from_duration(Duration::from_secs_f32(

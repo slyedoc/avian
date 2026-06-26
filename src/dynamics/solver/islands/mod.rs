@@ -42,9 +42,10 @@
 // The implementation is largely based on Box2D:
 // https://github.com/erincatto/box2d/blob/df9787b59e4480135fbd73d275f007b5d931a83f/src/island.c#L57
 
-mod sleeping;
+pub(crate) mod sleeping;
 pub use sleeping::{IslandSleepingPlugin, SleepBody, SleepIslands, WakeBody, WakeIslands};
 
+use crate::world::MainPhysicsWorldEntity;
 use bevy::{
     ecs::{entity_disabling::Disabled, lifecycle::HookContext, world::DeferredWorld},
     prelude::*,
@@ -70,7 +71,7 @@ pub struct IslandPlugin;
 
 impl Plugin for IslandPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PhysicsIslands>();
+        // PhysicsIslands is on the PhysicsWorld entity.
 
         // Insert `BodyIslandNode` for each `SolverBody`.
         app.register_required_components::<SolverBody, BodyIslandNode>();
@@ -155,11 +156,11 @@ impl Plugin for IslandPlugin {
 }
 
 fn split_island(
-    mut islands: ResMut<PhysicsIslands>,
+    mut islands: Single<&mut PhysicsIslands>,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     body_colliders: Query<&RigidBodyColliders>,
-    mut contact_graph: ResMut<ContactGraph>,
-    mut joint_graph: ResMut<JointGraph>,
+    mut contact_graph: Single<&mut ContactGraph>,
+    mut joint_graph: Single<&mut JointGraph>,
 ) {
     // Splitting is only done when bodies want to sleep.
     if let Some(island_id) = islands.split_candidate {
@@ -410,7 +411,7 @@ impl PhysicsIsland {
 }
 
 /// A resource for the [`PhysicsIsland`]s in the simulation.
-#[derive(Resource, Debug, Default, Clone)]
+#[derive(Component, Debug, Default, Clone)]
 pub struct PhysicsIslands {
     /// The list of islands.
     islands: StableVec<PhysicsIsland>,
@@ -1322,7 +1323,8 @@ impl BodyIslandNode {
     // Initialize a new island when `BodyIslandNode` is added to a body.
     fn on_add(mut world: DeferredWorld, ctx: HookContext) {
         // Create a new island for the body.
-        let mut islands = world.resource_mut::<PhysicsIslands>();
+        let world_entity = world.resource::<MainPhysicsWorldEntity>().0;
+        let mut islands = world.get_mut::<PhysicsIslands>(world_entity).unwrap();
         let island_id = islands.create_island_with(|island| {
             island.head_body = Some(ctx.entity);
             island.tail_body = Some(ctx.entity);
@@ -1351,7 +1353,8 @@ impl BodyIslandNode {
             next_body_island.prev = prev_body_entity;
         }
 
-        let mut islands = world.resource_mut::<PhysicsIslands>();
+        let world_entity = world.resource::<MainPhysicsWorldEntity>().0;
+        let mut islands = world.get_mut::<PhysicsIslands>(world_entity).unwrap();
         let island = islands
             .get_mut(island_id)
             .unwrap_or_else(|| panic!("Island {island_id} does not exist"));
@@ -1371,8 +1374,10 @@ impl BodyIslandNode {
                 debug_assert!(island.body_count == 0);
                 debug_assert!(island.contact_count == 0);
 
+                let world_entity = world.resource::<MainPhysicsWorldEntity>().0;
                 world
-                    .resource_mut::<PhysicsIslands>()
+                    .get_mut::<PhysicsIslands>(world_entity)
+                    .unwrap()
                     .remove_island(island_id);
 
                 #[cfg(feature = "validate")]
@@ -1395,9 +1400,9 @@ impl BodyIslandNode {
                         &BodyIslandNode,
                         Or<(With<Disabled>, Without<Disabled>)>,
                     >,
-                          islands: Res<PhysicsIslands>,
-                          contact_graph: Res<ContactGraph>,
-                          joint_graph: Res<JointGraph>| {
+                          islands: Single<&PhysicsIslands>,
+                          contact_graph: Single<&ContactGraph>,
+                          joint_graph: Single<&JointGraph>| {
                         let island = islands
                             .get(island_id)
                             .unwrap_or_else(|| panic!("Island {island_id} does not exist"));

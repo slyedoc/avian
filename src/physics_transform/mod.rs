@@ -186,7 +186,7 @@ pub type PhysicsTransformSet = PhysicsTransformSystems;
 #[allow(clippy::type_complexity)]
 pub fn transform_to_position(
     mut query: Query<(&GlobalTransform, &mut Position, &mut Rotation)>,
-    length_unit: Res<PhysicsLengthUnit>,
+    length_unit: Single<&PhysicsLengthUnit>,
     last_physics_tick: Res<LastPhysicsTick>,
     system_tick: SystemChangeTick,
 ) {

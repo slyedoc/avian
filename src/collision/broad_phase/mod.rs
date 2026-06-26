@@ -157,7 +157,7 @@ mod bvh_broad_phase;
 pub use bvh_broad_phase::BvhBroadPhasePlugin;
 
 use crate::{
-    collision::CollisionDiagnostics, dynamics::solver::joint_graph::JointGraph, prelude::*,
+    collision::CollisionDiagnostics, prelude::*,
 };
 use bevy::prelude::*;
 
@@ -175,8 +175,7 @@ pub struct BroadPhaseCorePlugin;
 
 impl Plugin for BroadPhaseCorePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ContactGraph>()
-            .init_resource::<JointGraph>();
+        // ContactGraph and JointGraph are on the PhysicsWorld entity.
 
         app.configure_sets(
             PhysicsSchedule,
