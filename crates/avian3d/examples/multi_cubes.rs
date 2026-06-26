@@ -1,11 +1,10 @@
 //! Demonstrates multiple physics worlds with different gravity.
 //!
-//! The left stack uses the default `MainPhysicsWorld` (normal gravity).
-//! The right stack uses a second `PhysicsWorld` with reduced gravity.
+//! The left stack (blue) uses the default `MainPhysicsWorld` with normal gravity.
+//! The right stack (orange) uses a second `PhysicsWorld` with reduced gravity.
 //!
-//! NOTE: Per-world iteration is not yet implemented, so both stacks
-//! currently share the same physics state. This example is a target
-//! for the multi-world feature.
+//! Physics entities are assigned to a world by being descendants of a
+//! `PhysicsWorld` entity in the hierarchy.
 
 #![allow(clippy::unnecessary_cast)]
 
@@ -25,10 +24,6 @@ fn main() {
         .run();
 }
 
-/// Marker for entities in the second physics world.
-#[derive(Component)]
-struct SecondWorld;
-
 fn setup(
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -36,11 +31,11 @@ fn setup(
 ) {
     let cube_mesh = meshes.add(Cuboid::default());
     let ground_material = materials.add(Color::srgb(0.7, 0.7, 0.8));
-    let blue_material = materials.add(Color::srgb(0.2, 0.7, 0.9));
-    let red_material = materials.add(Color::srgb(0.9, 0.3, 0.2));
+    let blue_material = materials.add(Color::srgb(0.3, 0.5, 0.9));
+    let orange_material = materials.add(Color::srgb(0.9, 0.5, 0.2));
 
-    // --- Second physics world with low gravity ---
-    let _second_world = commands
+    // Spawn a second physics world with low gravity.
+    let second_world = commands
         .spawn((
             PhysicsWorld,
             Gravity(Vector::Y * -2.0),
@@ -48,7 +43,10 @@ fn setup(
         ))
         .id();
 
-    // --- Left stack: default world (normal gravity) ---
+    let cube_size = 1.0;
+
+    // --- Left stack: default world (normal gravity, blue) ---
+    // Entities without a PhysicsWorld ancestor use the MainPhysicsWorld.
 
     // Ground
     commands.spawn((
@@ -59,8 +57,7 @@ fn setup(
         Collider::cuboid(1.0, 1.0, 1.0),
     ));
 
-    // Cubes
-    let cube_size = 1.0;
+    // Blue cubes
     for x in -1..2 {
         for y in 0..4 {
             for z in -1..2 {
@@ -80,21 +77,20 @@ fn setup(
         }
     }
 
-    // --- Right stack: second world (low gravity) ---
-    // TODO: Assign these entities to _second_world once PhysicsWorldOf
-    // relationship is implemented. For now they fall with normal gravity.
+    // --- Right stack: second world (low gravity, orange) ---
+    // These are children of the second_world entity.
 
     // Ground
     commands.spawn((
+        ChildOf(second_world),
         Mesh3d(cube_mesh.clone()),
         MeshMaterial3d(ground_material),
         Transform::from_xyz(8.0, -2.0, 0.0).with_scale(Vec3::new(12.0, 1.0, 12.0)),
         RigidBody::Static,
         Collider::cuboid(1.0, 1.0, 1.0),
-        SecondWorld,
     ));
 
-    // Cubes
+    // Orange cubes
     for x in -1..2 {
         for y in 0..4 {
             for z in -1..2 {
@@ -104,25 +100,26 @@ fn setup(
                     z as f32 * (cube_size + 0.05),
                 );
                 commands.spawn((
+                    ChildOf(second_world),
                     Mesh3d(cube_mesh.clone()),
-                    MeshMaterial3d(red_material.clone()),
-                    Transform::from_translation(position).with_scale(Vec3::splat(cube_size as f32)),
+                    MeshMaterial3d(orange_material.clone()),
+                    Transform::from_translation(position)
+                        .with_scale(Vec3::splat(cube_size as f32)),
                     RigidBody::Dynamic,
                     Collider::cuboid(1.0, 1.0, 1.0),
-                    SecondWorld,
                 ));
             }
         }
     }
 
-    // --- Labels ---
+    // --- UI Labels ---
     commands.spawn((
         Text::new("Default World\n(gravity -9.81)"),
         TextFont {
             font_size: FontSize::Px(20.0),
             ..default()
         },
-        TextColor(Color::srgb(0.2, 0.7, 0.9)),
+        TextColor(Color::srgb(0.3, 0.5, 0.9)),
         Node {
             position_type: PositionType::Absolute,
             bottom: Val::Px(40.0),
@@ -136,7 +133,7 @@ fn setup(
             font_size: FontSize::Px(20.0),
             ..default()
         },
-        TextColor(Color::srgb(0.9, 0.3, 0.2)),
+        TextColor(Color::srgb(0.9, 0.5, 0.2)),
         Node {
             position_type: PositionType::Absolute,
             bottom: Val::Px(40.0),

@@ -214,10 +214,14 @@ pub fn warm_start_xpbd_motors<
     bodies: Query<(&mut SolverBody, &SolverBodyInertia), Without<RigidBodyDisabled>>,
     mut joints: Query<(&C, &mut C::SolverData), (Without<RigidBody>, Without<JointDisabled>)>,
     time: Res<Time>,
-    solver_config: Single<&SolverConfig>,
+    worlds: Query<&SolverConfig, With<PhysicsWorld>>,
+    main_world: Res<MainPhysicsWorldEntity>,
 ) where
     C::SolverData: Component<Mutability = Mutable>,
 {
+    let Ok(solver_config) = worlds.get(main_world.0) else {
+        return;
+    };
     let delta_secs = time.delta_seconds_adjusted();
 
     let mut dummy_body1 = SolverBody::default();
@@ -309,7 +313,7 @@ fn project_angular_velocity(
 fn writeback_joint_forces<C: Component + EntityConstraint<2> + XpbdConstraint<2>>(
     mut joints: Query<(&C::SolverData, &mut JointForces)>,
     time: Res<Time>,
-    substep_count: Single<&SubstepCount>,
+    substep_count: Res<SubstepCount>,
 ) where
     C::SolverData: Component<Mutability = Mutable>,
 {

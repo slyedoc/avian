@@ -81,7 +81,7 @@ pub use total::{PhysicsTotalDiagnostics, PhysicsTotalDiagnosticsPlugin};
 use crate::{PhysicsStepSystems, schedule::PhysicsSchedule};
 use bevy::{
     diagnostic::DiagnosticPath,
-    prelude::{App, Component, IntoScheduleConfigs, Single, SystemSet, With},
+    prelude::{App, Component, IntoScheduleConfigs, Query, SystemSet, With},
 };
 #[cfg(feature = "bevy_diagnostic")]
 use bevy::{
@@ -89,6 +89,8 @@ use bevy::{
     prelude::Plugin,
 };
 use core::time::Duration;
+
+use crate::world::PhysicsWorld;
 
 /// A plugin that enables writing [physics diagnostics](crate::diagnostics)
 /// to [`bevy::diagnostic::DiagnosticsStore`]. It is not enabled by default
@@ -139,19 +141,25 @@ pub trait PhysicsDiagnostics: Default + Component<Mutability = bevy::ecs::compon
     }
 
     /// A system that resets the diagnostics to their default values.
-    fn reset(mut physics_diagnostics: Single<&mut Self>) {
-        **physics_diagnostics = Self::default();
+    fn reset(mut query: Query<&mut Self, With<PhysicsWorld>>) {
+        for mut physics_diagnostics in query.iter_mut() {
+            *physics_diagnostics = Self::default();
+        }
     }
 
     /// A system that writes diagnostics to the given [`Diagnostics`] instance.
     #[cfg(feature = "bevy_diagnostic")]
-    fn write_diagnostics(physics_diagnostics: Single<&Self>, mut diagnostics: Diagnostics) {
-        for (path, duration) in physics_diagnostics.timer_paths() {
-            diagnostics.add_measurement(path, || duration.as_secs_f64() * 1000.0);
-        }
+    fn write_diagnostics(query: Query<&Self, With<PhysicsWorld>>, mut diagnostics: Diagnostics) {
+        // TODO: Aggregate diagnostics across all worlds, or report per-world.
+        // For now, sum across all worlds.
+        for physics_diagnostics in query.iter() {
+            for (path, duration) in physics_diagnostics.timer_paths() {
+                diagnostics.add_measurement(path, || duration.as_secs_f64() * 1000.0);
+            }
 
-        for (path, count) in physics_diagnostics.counter_paths() {
-            diagnostics.add_measurement(path, || count as f64);
+            for (path, count) in physics_diagnostics.counter_paths() {
+                diagnostics.add_measurement(path, || count as f64);
+            }
         }
     }
 }

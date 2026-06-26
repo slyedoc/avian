@@ -143,6 +143,7 @@ impl Plugin for PhysicsDebugPlugin {
 
 #[allow(clippy::type_complexity)]
 fn debug_render_axes(
+    main_world: Res<MainPhysicsWorldEntity>,
     bodies: Query<(
         &GlobalTransform,
         &ComputedCenterOfMass,
@@ -151,8 +152,9 @@ fn debug_render_axes(
     )>,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
-    length_unit: Single<&PhysicsLengthUnit>,
+    world_length_unit: Query<&PhysicsLengthUnit, With<PhysicsWorld>>,
 ) {
+    let Ok(length_unit) = world_length_unit.get(main_world.0) else { return; };
     let config = store.config::<PhysicsGizmos>().1;
     for (transform, local_com, sleeping, render_config) in &bodies {
         let pos = Position::from(transform);
@@ -254,10 +256,12 @@ fn debug_render_aabbs(
 }
 
 fn debug_render_bvh(
-    bvh: Single<&ColliderTrees>,
+    main_world: Res<MainPhysicsWorldEntity>,
+    world_bvh: Query<&ColliderTrees, With<PhysicsWorld>>,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
 ) {
+    let Ok(bvh) = world_bvh.get(main_world.0) else { return; };
     let config = store.config::<PhysicsGizmos>().1;
 
     let Some(collider_tree_color) = config.collider_tree_color else {
@@ -314,12 +318,14 @@ fn debug_render_colliders(
 }
 
 fn debug_render_contacts(
+    main_world: Res<MainPhysicsWorldEntity>,
     collisions: Collisions,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
     time: Res<Time<Substeps>>,
-    length_unit: Single<&PhysicsLengthUnit>,
+    world_length_unit: Query<&PhysicsLengthUnit, With<PhysicsWorld>>,
 ) {
+    let Ok(length_unit) = world_length_unit.get(main_world.0) else { return; };
     let config = store.config::<PhysicsGizmos>().1;
 
     if config.contact_point_color.is_none() && config.contact_normal_color.is_none() {
@@ -418,11 +424,13 @@ pub fn debug_render_constraint<T: Component + DebugRenderConstraint<N>, const N:
 }
 
 fn debug_render_raycasts(
+    main_world: Res<MainPhysicsWorldEntity>,
     query: Query<(&RayCaster, &RayHits)>,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
-    length_unit: Single<&PhysicsLengthUnit>,
+    world_length_unit: Query<&PhysicsLengthUnit, With<PhysicsWorld>>,
 ) {
+    let Ok(length_unit) = world_length_unit.get(main_world.0) else { return; };
     let config = store.config::<PhysicsGizmos>().1;
     for (ray, hits) in &query {
         let ray_color = config.raycast_color.unwrap_or(Color::NONE);
@@ -448,11 +456,13 @@ fn debug_render_raycasts(
     any(feature = "parry-f32", feature = "parry-f64")
 ))]
 fn debug_render_shapecasts(
+    main_world: Res<MainPhysicsWorldEntity>,
     query: Query<(&ShapeCaster, &ShapeHits)>,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
-    length_unit: Single<&PhysicsLengthUnit>,
+    world_length_unit: Query<&PhysicsLengthUnit, With<PhysicsWorld>>,
 ) {
+    let Ok(length_unit) = world_length_unit.get(main_world.0) else { return; };
     let config = store.config::<PhysicsGizmos>().1;
     for (shape_caster, hits) in &query {
         let ray_color = config.shapecast_color.unwrap_or(Color::NONE);
@@ -478,12 +488,14 @@ fn debug_render_shapecasts(
 }
 
 fn debug_render_islands(
-    islands: Single<&PhysicsIslands>,
+    main_world: Res<MainPhysicsWorldEntity>,
+    world_islands: Query<&PhysicsIslands, With<PhysicsWorld>>,
     bodies: Query<(&RigidBodyColliders, &BodyIslandNode)>,
     aabbs: Query<&ColliderAabb>,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
 ) {
+    let Ok(islands) = world_islands.get(main_world.0) else { return; };
     let config = store.config::<PhysicsGizmos>().1;
 
     for island in islands.iter() {

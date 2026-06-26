@@ -5,8 +5,15 @@
 //!
 //! The [`MainPhysicsWorld`] marker identifies the default world,
 //! spawned automatically by [`PhysicsWorldPlugin`].
+//!
+//! Physics entities are assigned to a world by being descendants of a
+//! [`PhysicsWorld`] entity in the hierarchy. Entities without a
+//! [`PhysicsWorld`] ancestor fall back to the [`MainPhysicsWorld`].
 
-use bevy::prelude::*;
+use bevy::{
+    ecs::{relationship::Relationship, system::SystemParam, world::DeferredWorld},
+    prelude::*,
+};
 
 #[cfg(feature = "bevy_diagnostic")]
 use crate::diagnostics::{PhysicsEntityDiagnostics, PhysicsTotalDiagnostics};
@@ -38,13 +45,18 @@ use crate::{
 
 /// A physics world entity that holds per-world physics state as components.
 ///
-/// Each converted physics resource is added via `#[require]` so that
+/// Each per-world component is added via `#[require]` so that
 /// spawning a `PhysicsWorld` automatically initializes all state.
+///
+/// Physics entities are assigned to a world by being descendants
+/// of a `PhysicsWorld` entity in the bevy hierarchy. Use
+/// [`PhysicsWorldLookup`] to resolve which world an entity belongs to.
 #[derive(Component, Default)]
 #[require(
+    Transform,
+    Visibility,
     Gravity,
     PhysicsLengthUnit,
-    SubstepCount,
     SolverConfig,
     ContactSoftnessCoefficients,
     NarrowPhaseConfig,
@@ -85,7 +97,59 @@ pub struct MainPhysicsWorld;
 #[derive(Resource, Deref)]
 pub struct MainPhysicsWorldEntity(pub Entity);
 
-/// Plugin that spawns the [`MainPhysicsWorld`] entity in `build()`.
+// --- Hierarchy-based world lookup ---
+
+/// Walks up the hierarchy from `entity` to find the nearest ancestor
+/// with a [`PhysicsWorld`] component. Works in [`DeferredWorld`] (hooks).
+///
+/// Returns `None` if no `PhysicsWorld` ancestor is found.
+pub fn find_physics_world_in_hierarchy(world: &DeferredWorld, entity: Entity) -> Option<Entity> {
+    let mut current = entity;
+    loop {
+        if world.get::<PhysicsWorld>(current).is_some() {
+            return Some(current);
+        }
+        current = world.get::<ChildOf>(current)?.get();
+    }
+}
+
+/// Walks up the hierarchy from `entity` to find the nearest ancestor
+/// with a [`PhysicsWorld`] component, falling back to [`MainPhysicsWorldEntity`].
+///
+/// Works in [`DeferredWorld`] (hooks).
+pub fn find_physics_world_or_main(world: &DeferredWorld, entity: Entity) -> Entity {
+    find_physics_world_in_hierarchy(world, entity)
+        .unwrap_or_else(|| world.resource::<MainPhysicsWorldEntity>().0)
+}
+
+/// A [`SystemParam`] that resolves which [`PhysicsWorld`] entity a given entity belongs to.
+///
+/// Walks up the hierarchy via [`ChildOf`] to find the nearest [`PhysicsWorld`] ancestor.
+/// Falls back to [`MainPhysicsWorldEntity`] for entities without a `PhysicsWorld` ancestor.
+#[derive(SystemParam)]
+pub struct PhysicsWorldLookup<'w, 's> {
+    parents: Query<'w, 's, &'static ChildOf>,
+    worlds: Query<'w, 's, (), With<PhysicsWorld>>,
+    main_world: Res<'w, MainPhysicsWorldEntity>,
+}
+
+impl PhysicsWorldLookup<'_, '_> {
+    /// Returns the [`PhysicsWorld`] entity for the given entity by walking up the hierarchy.
+    pub fn world_entity_of(&self, entity: Entity) -> Entity {
+        let mut current = entity;
+        loop {
+            if self.worlds.contains(current) {
+                return current;
+            }
+            match self.parents.get(current) {
+                Ok(child_of) => current = child_of.get(),
+                Err(_) => return self.main_world.0,
+            }
+        }
+    }
+}
+
+/// Plugin that spawns the [`MainPhysicsWorld`] entity.
 pub struct PhysicsWorldPlugin;
 
 impl Plugin for PhysicsWorldPlugin {

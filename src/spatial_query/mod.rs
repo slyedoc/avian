@@ -397,7 +397,7 @@ fn update_shape_caster_positions(
 fn raycast(
     mut rays: Query<(Entity, &mut RayCaster, &mut RayHits)>,
     spatial_query: SpatialQuery,
-    mut diagnostics: Single<&mut SpatialQueryDiagnostics>,
+    mut worlds: Query<&mut SpatialQueryDiagnostics, With<PhysicsWorld>>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -409,14 +409,17 @@ fn raycast(
         }
     }
 
-    diagnostics.update_ray_casters = start.elapsed();
+    let elapsed = start.elapsed();
+    for mut diagnostics in worlds.iter_mut() {
+        diagnostics.update_ray_casters = elapsed;
+    }
 }
 
 #[cfg(any(feature = "parry-f32", feature = "parry-f64"))]
 fn shapecast(
     mut shape_casters: Query<(Entity, &mut ShapeCaster, &mut ShapeHits)>,
     spatial_query: SpatialQuery,
-    mut diagnostics: Single<&mut SpatialQueryDiagnostics>,
+    mut worlds: Query<&mut SpatialQueryDiagnostics, With<PhysicsWorld>>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -428,5 +431,8 @@ fn shapecast(
         }
     }
 
-    diagnostics.update_shape_casters = start.elapsed();
+    let elapsed = start.elapsed();
+    for mut diagnostics in worlds.iter_mut() {
+        diagnostics.update_shape_casters = elapsed;
+    }
 }

@@ -245,7 +245,7 @@ fn run_physics_schedule(world: &mut World, mut is_first_run: Local<IsFirstRun>) 
 
             // Advance the substep clock already so that systems running
             // before the substepping loop have the right delta.
-            let SubstepCount(substeps) = *world.query::<&SubstepCount>().single(world).unwrap();
+            let SubstepCount(substeps) = *world.resource::<SubstepCount>();
             let sub_delta = timestep.div_f64(substeps as f64);
             world.resource_mut::<Time<Substeps>>().advance_by(sub_delta);
         }
