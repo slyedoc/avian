@@ -249,10 +249,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "175571dd1d178ced59193a6fc02dde1b972eb0bc56c892cde9beeceac5bf0f6b"
 
 [[package]]
-name = "ash"
-version = "0.38.0+1.3.281"
+name = "ascii-canvas"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bb44936d800fea8f016d7f2311c6a4f97aebd5dc86f09906139ec848cf3a46f"
+checksum = "ef1e3e699d84ab1b0911a1010c5c106aa34ae89aeac103be5ce0c3859db1e891"
+dependencies = [
+ "term",
+]
+
+[[package]]
+name = "ash"
+version = "0.38.0+1.4.352"
+source = "git+https://github.com/ash-rs/ash.git?branch=master#a9a1fb17e98a0cde146caada86200d809306200d"
 dependencies = [
  "libloading",
 ]
@@ -459,7 +467,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 [[package]]
 name = "bevy"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_internal",
 ]
@@ -467,7 +475,7 @@ dependencies = [
 [[package]]
 name = "bevy_a11y"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "accesskit",
  "bevy_app",
@@ -480,7 +488,7 @@ dependencies = [
 [[package]]
 name = "bevy_android"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "android-activity",
 ]
@@ -488,7 +496,7 @@ dependencies = [
 [[package]]
 name = "bevy_animation"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_animation_macros",
  "bevy_app",
@@ -520,7 +528,7 @@ dependencies = [
 [[package]]
 name = "bevy_animation_macros"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_macro_utils",
  "quote",
@@ -530,7 +538,7 @@ dependencies = [
 [[package]]
 name = "bevy_anti_alias"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -551,7 +559,7 @@ dependencies = [
 [[package]]
 name = "bevy_app"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_derive",
  "bevy_ecs",
@@ -572,7 +580,7 @@ dependencies = [
 [[package]]
 name = "bevy_asset"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "async-broadcast",
  "async-channel",
@@ -616,7 +624,7 @@ dependencies = [
 [[package]]
 name = "bevy_asset_macros"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_macro_utils",
  "proc-macro2",
@@ -627,7 +635,7 @@ dependencies = [
 [[package]]
 name = "bevy_audio"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -642,7 +650,7 @@ dependencies = [
 [[package]]
 name = "bevy_camera"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -667,7 +675,7 @@ dependencies = [
 [[package]]
 name = "bevy_clipboard"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -681,7 +689,7 @@ dependencies = [
 [[package]]
 name = "bevy_color"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_math",
  "bevy_reflect",
@@ -696,7 +704,7 @@ dependencies = [
 [[package]]
 name = "bevy_core_pipeline"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -724,7 +732,7 @@ dependencies = [
 [[package]]
 name = "bevy_derive"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_macro_utils",
  "quote",
@@ -734,7 +742,7 @@ dependencies = [
 [[package]]
 name = "bevy_dev_tools"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -767,7 +775,7 @@ dependencies = [
 [[package]]
 name = "bevy_diagnostic"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "atomic-waker",
  "bevy_app",
@@ -784,7 +792,7 @@ dependencies = [
 [[package]]
 name = "bevy_ecs"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "arrayvec",
  "bevy_ecs_macros",
@@ -811,7 +819,7 @@ dependencies = [
 [[package]]
 name = "bevy_ecs_macro_logic"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_macro_utils",
  "proc-macro2",
@@ -822,7 +830,7 @@ dependencies = [
 [[package]]
 name = "bevy_ecs_macros"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_ecs_macro_logic",
  "bevy_macro_utils",
@@ -834,7 +842,7 @@ dependencies = [
 [[package]]
 name = "bevy_encase_derive"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_macro_utils",
  "encase_derive_impl",
@@ -843,7 +851,7 @@ dependencies = [
 [[package]]
 name = "bevy_feathers"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "accesskit",
  "bevy_a11y",
@@ -874,7 +882,7 @@ dependencies = [
 [[package]]
 name = "bevy_gilrs"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -889,7 +897,7 @@ dependencies = [
 [[package]]
 name = "bevy_gizmos"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -911,7 +919,7 @@ dependencies = [
 [[package]]
 name = "bevy_gizmos_macros"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_macro_utils",
  "quote",
@@ -921,7 +929,7 @@ dependencies = [
 [[package]]
 name = "bevy_gizmos_render"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -949,7 +957,7 @@ dependencies = [
 [[package]]
 name = "bevy_gltf"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "async-lock",
  "base64",
@@ -996,7 +1004,7 @@ dependencies = [
 [[package]]
 name = "bevy_image"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1024,7 +1032,7 @@ dependencies = [
 [[package]]
 name = "bevy_input"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -1041,7 +1049,7 @@ dependencies = [
 [[package]]
 name = "bevy_input_focus"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -1057,7 +1065,7 @@ dependencies = [
 [[package]]
 name = "bevy_internal"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_a11y",
  "bevy_android",
@@ -1096,6 +1104,7 @@ dependencies = [
  "bevy_render",
  "bevy_scene",
  "bevy_shader",
+ "bevy_solari",
  "bevy_sprite",
  "bevy_sprite_render",
  "bevy_state",
@@ -1115,7 +1124,7 @@ dependencies = [
 [[package]]
 name = "bevy_light"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1140,7 +1149,7 @@ dependencies = [
 [[package]]
 name = "bevy_log"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "android_log-sys",
  "bevy_app",
@@ -1157,7 +1166,7 @@ dependencies = [
 [[package]]
 name = "bevy_macro_utils"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1168,7 +1177,7 @@ dependencies = [
 [[package]]
 name = "bevy_material"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_asset",
  "bevy_derive",
@@ -1190,7 +1199,7 @@ dependencies = [
 [[package]]
 name = "bevy_material_macros"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_macro_utils",
  "quote",
@@ -1200,7 +1209,7 @@ dependencies = [
 [[package]]
 name = "bevy_math"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "approx",
  "arrayvec",
@@ -1219,7 +1228,7 @@ dependencies = [
 [[package]]
 name = "bevy_mesh"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1268,7 +1277,7 @@ dependencies = [
 [[package]]
 name = "bevy_pbr"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "arrayvec",
  "bevy_app",
@@ -1310,7 +1319,7 @@ dependencies = [
 [[package]]
 name = "bevy_picking"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1333,7 +1342,7 @@ dependencies = [
 [[package]]
 name = "bevy_platform"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "critical-section",
  "foldhash 0.2.0",
@@ -1348,13 +1357,13 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-time",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
 name = "bevy_post_process"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1378,12 +1387,12 @@ dependencies = [
 [[package]]
 name = "bevy_ptr"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 
 [[package]]
 name = "bevy_reflect"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "assert_type_match",
  "bevy_platform",
@@ -1411,7 +1420,7 @@ dependencies = [
 [[package]]
 name = "bevy_reflect_derive"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_macro_utils",
  "indexmap",
@@ -1424,7 +1433,7 @@ dependencies = [
 [[package]]
 name = "bevy_render"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "async-channel",
  "bevy_app",
@@ -1477,7 +1486,7 @@ dependencies = [
 [[package]]
 name = "bevy_render_macros"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_macro_utils",
  "proc-macro2",
@@ -1488,7 +1497,7 @@ dependencies = [
 [[package]]
 name = "bevy_scene"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1499,6 +1508,9 @@ dependencies = [
  "bevy_reflect",
  "bevy_scene_macros",
  "bevy_utils",
+ "lalrpop",
+ "lalrpop-util",
+ "nom",
  "smallvec",
  "thiserror 2.0.18",
  "tracing",
@@ -1508,7 +1520,7 @@ dependencies = [
 [[package]]
 name = "bevy_scene_macros"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_ecs_macro_logic",
  "bevy_macro_utils",
@@ -1520,7 +1532,7 @@ dependencies = [
 [[package]]
 name = "bevy_shader"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_asset",
  "bevy_platform",
@@ -1536,9 +1548,55 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_solari"
+version = "0.20.0-dev"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
+dependencies = [
+ "ash",
+ "bevy_anti_alias",
+ "bevy_app",
+ "bevy_asset",
+ "bevy_camera",
+ "bevy_color",
+ "bevy_core_pipeline",
+ "bevy_derive",
+ "bevy_diagnostic",
+ "bevy_ecs",
+ "bevy_gltf",
+ "bevy_image",
+ "bevy_log",
+ "bevy_material",
+ "bevy_math",
+ "bevy_mesh",
+ "bevy_pbr",
+ "bevy_picking",
+ "bevy_platform",
+ "bevy_post_process",
+ "bevy_reflect",
+ "bevy_render",
+ "bevy_shader",
+ "bevy_tasks",
+ "bevy_transform",
+ "bevy_ui",
+ "bevy_utils",
+ "bytemuck",
+ "derive_more",
+ "lz4_flex",
+ "meshopt",
+ "naga",
+ "naga_oil",
+ "range-alloc",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
+ "wgpu",
+ "wgpu-types",
+]
+
+[[package]]
 name = "bevy_sprite"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1563,7 +1621,7 @@ dependencies = [
 [[package]]
 name = "bevy_sprite_render"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1595,7 +1653,7 @@ dependencies = [
 [[package]]
 name = "bevy_state"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -1610,7 +1668,7 @@ dependencies = [
 [[package]]
 name = "bevy_state_macros"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_macro_utils",
  "quote",
@@ -1620,7 +1678,7 @@ dependencies = [
 [[package]]
 name = "bevy_tasks"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "async-channel",
  "async-executor",
@@ -1638,7 +1696,7 @@ dependencies = [
 [[package]]
 name = "bevy_text"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1666,7 +1724,7 @@ dependencies = [
 [[package]]
 name = "bevy_time"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -1680,7 +1738,7 @@ dependencies = [
 [[package]]
 name = "bevy_transform"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -1705,7 +1763,7 @@ dependencies = [
 [[package]]
 name = "bevy_ui"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "accesskit",
  "bevy_a11y",
@@ -1743,7 +1801,7 @@ dependencies = [
 [[package]]
 name = "bevy_ui_render"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1775,7 +1833,7 @@ dependencies = [
 [[package]]
 name = "bevy_ui_widgets"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "accesskit",
  "bevy_a11y",
@@ -1799,7 +1857,7 @@ dependencies = [
 [[package]]
 name = "bevy_utils"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "async-channel",
  "bevy_platform",
@@ -1811,7 +1869,7 @@ dependencies = [
 [[package]]
 name = "bevy_window"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1829,7 +1887,7 @@ dependencies = [
 [[package]]
 name = "bevy_winit"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "accesskit",
  "accesskit_winit",
@@ -1861,7 +1919,7 @@ dependencies = [
 [[package]]
 name = "bevy_world_serialization"
 version = "0.20.0-dev"
-source = "git+https://github.com/bevyengine/bevy?branch=main#cbfaae46da0a10f69e1b60f60255c9aca8143a8a"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1921,7 +1979,16 @@ dependencies = [
  "cc",
  "cfg-if",
  "constant_time_eq",
- "cpufeatures",
+ "cpufeatures 0.3.0",
+]
+
+[[package]]
+name = "block-buffer"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
+dependencies = [
+ "generic-array",
 ]
 
 [[package]]
@@ -2078,7 +2145,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d524456ba66e72eb8b115ff89e01e497f8e6d11d78b70b1aa13c0fbd97540a81"
 dependencies = [
  "cfg-if",
- "cpufeatures",
+ "cpufeatures 0.3.0",
  "rand_core",
 ]
 
@@ -2345,6 +2412,15 @@ dependencies = [
 
 [[package]]
 name = "cpufeatures"
+version = "0.2.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "cpufeatures"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b2a41393f66f16b0823bb79094d54ac5fbd34ab292ddafb9a0456ac9f87d201"
@@ -2488,6 +2564,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 
 [[package]]
+name = "crypto-common"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
+dependencies = [
+ "generic-array",
+ "typenum",
+]
+
+[[package]]
 name = "ctrlc"
 version = "3.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2537,6 +2623,16 @@ dependencies = [
  "rustc_version",
  "syn",
  "unicode-xid",
+]
+
+[[package]]
+name = "digest"
+version = "0.10.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
+dependencies = [
+ "block-buffer",
+ "crypto-common",
 ]
 
 [[package]]
@@ -2778,6 +2874,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "float-cmp"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b09cf3155332e944990140d967ff5eceb70df778b34f77d8075db46e4704e6d8"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2907,6 +3012,16 @@ dependencies = [
  "futures-task",
  "pin-project-lite",
  "slab",
+]
+
+[[package]]
+name = "generic-array"
+version = "0.14.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
+dependencies = [
+ "typenum",
+ "version_check",
 ]
 
 [[package]]
@@ -3107,8 +3222,7 @@ dependencies = [
 [[package]]
 name = "gpu-allocator"
 version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51255ea7cfaadb6c5f1528d43e92a82acb2b96c43365989a28b2d44ee38f8795"
+source = "git+https://github.com/slyedoc/gpu-allocator.git?branch=ash-push-rename#b3c8f269487f9415dbf595ae8213cc660f6c3f33"
 dependencies = [
  "ash",
  "hashbrown 0.16.1",
@@ -3616,6 +3730,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "keccak"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb26cec98cce3a3d96cbb7bced3c4b16e3d13f27ec56dbd62cbc8f39cfb9d653"
+dependencies = [
+ "cpufeatures 0.2.17",
+]
+
+[[package]]
 name = "khronos-egl"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3639,6 +3762,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d50be8a24c37debdf3170be6ca396d5b5b165f37f94837891adac735ca416b8"
 dependencies = [
  "bitflags 2.13.0",
+]
+
+[[package]]
+name = "lalrpop"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98a80a963123205c7157323c99611bc4abb65dcbd62ef46dc4bac74a3941bc75"
+dependencies = [
+ "ascii-canvas",
+ "bit-set",
+ "ena",
+ "itertools 0.14.0",
+ "lalrpop-util",
+ "petgraph",
+ "pico-args",
+ "regex",
+ "regex-syntax",
+ "sha3",
+ "string_cache",
+ "term",
+ "unicode-xid",
+ "walkdir",
+]
+
+[[package]]
+name = "lalrpop-util"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "884f3e747ed2dcee867cda1b0c31a048f9e20de2d916a248949319921a2e666e"
+dependencies = [
+ "regex-automata",
 ]
 
 [[package]]
@@ -3754,6 +3908,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
+name = "lz4_flex"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ef0d4ed8669f8f8826eb00dc878084aa8f253506c4fd5e8f58f5bce72ddb97e"
+dependencies = [
+ "twox-hash",
+]
+
+[[package]]
 name = "mach2"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3787,6 +3950,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "meshopt"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e01e77ead21976b3a9f01ec1724f766923da74f0726364e2b0f425658935d71a"
+dependencies = [
+ "bitflags 2.13.0",
+ "cc",
+ "float-cmp",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "miniz_oxide"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3815,8 +3990,7 @@ checksum = "bc0287524726960e07b119cebd01678f852f147742ae0d925e6a520dca956126"
 [[package]]
 name = "naga"
 version = "29.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0dd91265cc2454558f659b3b4b9640f0ddb8cc6521277f166b8a8c181c898079"
+source = "git+https://github.com/slyedoc/wgpu.git?branch=solari-rt-naga#57f81caee442bd290756e08ee888a1810cfeb86b"
 dependencies = [
  "arrayvec",
  "bit-set",
@@ -3842,8 +4016,7 @@ dependencies = [
 [[package]]
 name = "naga_oil"
 version = "0.22.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "319f03062940ed85c03da020042618356bb8ca5263020322930883b05e30208e"
+source = "git+https://github.com/slyedoc/naga_oil.git?branch=solari-ser#b9480dd99ed6f2d098c2b7ef4a84d770e6c0c06d"
 dependencies = [
  "codespan-reporting 0.12.0",
  "data-encoding",
@@ -3893,6 +4066,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "new_debug_unreachable"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
+
+[[package]]
 name = "nix"
 version = "0.31.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3902,6 +4081,15 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+]
+
+[[package]]
+name = "nom"
+version = "8.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df9761775871bdef83bee530e60050f7e54b1105350d6884eb0fb4f46c2f9405"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
@@ -4638,6 +4826,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "phf_shared"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e57fef6bc5981e38c2ce2d63bfa546861309f875b8a75f092d1d54ae2d64f266"
+dependencies = [
+ "siphasher",
+]
+
+[[package]]
+name = "pico-args"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5be167a7af36ee22fe3115051bc51f6e6c7054c9348e28deb4f49bd6f705a315"
+
+[[package]]
 name = "pin-project"
 version = "1.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4775,6 +4978,12 @@ checksum = "bb458bb7f6e250e6eb79d5026badc10a3ebb8f9a15d1fff0f13d17c71f4d6dee"
 dependencies = [
  "unicode-xid",
 ]
+
+[[package]]
+name = "precomputed-hash"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
 name = "presser"
@@ -5368,6 +5577,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha3"
+version = "0.10.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77fd7028345d415a4034cf8777cd4f8ab1851274233b45f84e3d955502d93874"
+dependencies = [
+ "digest",
+ "keccak",
+]
+
+[[package]]
 name = "sharded-slab"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5417,6 +5636,12 @@ name = "simdutf8"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
+
+[[package]]
+name = "siphasher"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649"
 
 [[package]]
 name = "skrifa"
@@ -5545,6 +5770,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6637bab7722d379c8b41ba849228d680cc12d0a45ba1fa2b48f2a30577a06731"
 
 [[package]]
+name = "string_cache"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a18596f8c785a729f2819c0f6a7eae6ebeebdfffbfe4214ae6b087f690e31901"
+dependencies = [
+ "new_debug_unreachable",
+ "parking_lot",
+ "phf_shared",
+ "precomputed-hash",
+]
+
+[[package]]
 name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5616,6 +5853,15 @@ dependencies = [
  "grid",
  "serde",
  "slotmap",
+]
+
+[[package]]
+name = "term"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8c27177b12a6399ffc08b98f76f7c9a1f4fe9fc967c784c5a071fa8d93cf7e1"
+dependencies = [
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5888,6 +6134,12 @@ name = "typeid"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc7d623258602320d5c55d1bc22793b57daff0ec7efc270ea7d55ce1d5f5471c"
+
+[[package]]
+name = "typenum"
+version = "1.20.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
 name = "typewit"
@@ -6274,8 +6526,7 @@ dependencies = [
 [[package]]
 name = "wgpu"
 version = "29.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb3feacc458f7bee8bc1737149b42b6c731aa461039a4264a67bb6681646b250"
+source = "git+https://github.com/slyedoc/wgpu.git?branch=solari-rt-naga#57f81caee442bd290756e08ee888a1810cfeb86b"
 dependencies = [
  "arrayvec",
  "bitflags 2.13.0",
@@ -6302,8 +6553,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core"
 version = "29.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02da3ad1b568337f25513b317870960ef87073ea0945502e44b864b67a8c77b7"
+source = "git+https://github.com/slyedoc/wgpu.git?branch=solari-rt-naga#57f81caee442bd290756e08ee888a1810cfeb86b"
 dependencies = [
  "arrayvec",
  "bit-set",
@@ -6335,8 +6585,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-apple"
 version = "29.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62e51b5447e144b3dbba4feb01f80f4fa21696fa0cd99afb2c3df1affd6fdb28"
+source = "git+https://github.com/slyedoc/wgpu.git?branch=solari-rt-naga#57f81caee442bd290756e08ee888a1810cfeb86b"
 dependencies = [
  "wgpu-hal",
 ]
@@ -6344,8 +6593,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-wasm"
 version = "29.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c2f2fb042f36920771deb0b966543c5751b18f3d327760ffc90f74e20b2dcd4"
+source = "git+https://github.com/slyedoc/wgpu.git?branch=solari-rt-naga#57f81caee442bd290756e08ee888a1810cfeb86b"
 dependencies = [
  "wgpu-hal",
 ]
@@ -6353,8 +6601,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-windows-linux-android"
 version = "29.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bfb01076d0aa08b0ba9bd741e178b5cc440f5abe99d9581323a4c8b5d1a1916"
+source = "git+https://github.com/slyedoc/wgpu.git?branch=solari-rt-naga#57f81caee442bd290756e08ee888a1810cfeb86b"
 dependencies = [
  "wgpu-hal",
 ]
@@ -6362,8 +6609,7 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "29.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31f8e1a9e7a8512f276f7c62e018c7fa8d60954303fed2e5750114332049193f"
+source = "git+https://github.com/slyedoc/wgpu.git?branch=solari-rt-naga#57f81caee442bd290756e08ee888a1810cfeb86b"
 dependencies = [
  "android_system_properties",
  "arrayvec",
@@ -6416,8 +6662,7 @@ dependencies = [
 [[package]]
 name = "wgpu-naga-bridge"
 version = "29.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59c654c483f058800972c3645e95388a7eca31bf9fe1933bc20e036588a0be02"
+source = "git+https://github.com/slyedoc/wgpu.git?branch=solari-rt-naga#57f81caee442bd290756e08ee888a1810cfeb86b"
 dependencies = [
  "naga",
  "wgpu-types",
@@ -6426,8 +6671,7 @@ dependencies = [
 [[package]]
 name = "wgpu-types"
 version = "29.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9bcc31518a0e9735aefebedb5f7a9ef3ed1c42549c9f4c882fa9060ceaac639"
+source = "git+https://github.com/slyedoc/wgpu.git?branch=solari-rt-naga#57f81caee442bd290756e08ee888a1810cfeb86b"
 dependencies = [
  "bitflags 2.13.0",
  "bytemuck",
@@ -7004,3 +7248,8 @@ name = "zmij"
 version = "1.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
+
+[[patch.unused]]
+name = "bevy_remote"
+version = "0.20.0-dev"
+source = "git+https://github.com/slyedoc/bevy?branch=solari-rt-pipeline#e7e21afd34c93b0925e1b736a44f31f8ad600ff6"
