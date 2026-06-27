@@ -555,10 +555,17 @@ pub struct PhysicsWorldPlugin;
 
 impl Plugin for PhysicsWorldPlugin {
     fn build(&self, app: &mut App) {
-        let entity = app.world_mut().spawn(MainPhysicsWorld).id();
-        app.insert_resource(MainPhysicsWorldEntity(entity));
-
         // Register the transfer observer.
         app.add_observer(on_transfer_to_world);
+    }
+
+    // Spawn the main world in `finish`, *after* every plugin's `build` has run — so any
+    // `register_required_components::<PhysicsWorld, _>` (e.g. the solari `SolariFrame`
+    // binding) is registered before the `PhysicsWorld` archetype first exists. Spawning
+    // in `build` creates that archetype too early and a later registration hits
+    // `ArchetypeExists`.
+    fn finish(&self, app: &mut App) {
+        let entity = app.world_mut().spawn(MainPhysicsWorld).id();
+        app.insert_resource(MainPhysicsWorldEntity(entity));
     }
 }
