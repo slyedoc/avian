@@ -526,6 +526,12 @@ pub mod spatial_query;
 
 pub mod world;
 
+/// Optional `bevy_solari` integration (the `solari` feature): makes every
+/// [`PhysicsWorld`](world::PhysicsWorld) a solari reference frame and rebases the camera
+/// on a frame handoff. See [`AvianSolariPlugin`](solari::AvianSolariPlugin).
+#[cfg(feature = "solari")]
+pub mod solari;
+
 pub mod data_structures;
 
 // TODO: Where should this go?
@@ -569,6 +575,8 @@ pub mod prelude {
         any(feature = "parry-f32", feature = "parry-f64")
     ))]
     pub use crate::character_controller::prelude::*;
+    #[cfg(feature = "solari")]
+    pub use crate::solari::AvianSolariPlugin;
     pub(crate) use crate::{
         diagnostics::AppDiagnosticsExt,
         math::*,

@@ -28,7 +28,16 @@ const STATION_B_CELL: i32 = 1_000_000;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, SolariPlugin, PhysicsPlugins::default()))
+        // `AvianSolariPlugin` makes every PhysicsWorld a solari reference frame (the
+        // stations' bodies ride their anchor's pose) and rebases the camera on a frame
+        // handoff. The anchors below carry only a `SolariGridCell` — `SolariFrame` is
+        // auto-required by the plugin.
+        .add_plugins((
+            DefaultPlugins,
+            SolariPlugin,
+            PhysicsPlugins::default(),
+            AvianSolariPlugin,
+        ))
         .insert_resource(ClearColor(Color::srgb(0.02, 0.02, 0.05)))
         .add_systems(Startup, setup)
         .add_systems(

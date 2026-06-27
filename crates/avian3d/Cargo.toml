@@ -50,6 +50,11 @@ xpbd_joints = []
 collider-from-mesh = ["bevy/bevy_mesh", "bevy/bevy_mikktspace", "3d"]
 bevy_scene = ["bevy/bevy_world_serialization"]
 bevy_picking = ["bevy/bevy_picking"]
+
+# Optional bevy_solari integration: AvianSolariPlugin makes every PhysicsWorld a solari
+# reference frame and rebases the camera on a frame handoff. 3D + RT only. Pulls
+# bevy_solari into the library (it is otherwise an example-only dev-dependency).
+solari = ["3d", "bevy/bevy_solari", "bevy/cluster_processor"]
 serialize = [
     "dep:serde",
     "bevy/serialize",
@@ -154,7 +159,7 @@ required-features = ["3d", "default-collider"]
 
 [[example]]
 name = "solari_cubes"
-required-features = ["3d", "default-collider"]
+required-features = ["3d", "default-collider", "solari"]
 
 [[example]]
 name = "custom_broad_phase"
