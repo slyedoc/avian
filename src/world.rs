@@ -134,6 +134,11 @@ pub struct PhysicsWorldLookup<'w, 's> {
 }
 
 impl PhysicsWorldLookup<'_, '_> {
+    /// Returns the [`MainPhysicsWorldEntity`], useful when any world's config will do.
+    pub fn any_world_entity(&self) -> Entity {
+        self.main_world.0
+    }
+
     /// Returns the [`PhysicsWorld`] entity for the given entity by walking up the hierarchy.
     pub fn world_entity_of(&self, entity: Entity) -> Entity {
         let mut current = entity;

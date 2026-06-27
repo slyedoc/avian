@@ -34,15 +34,6 @@ fn setup(
     let blue_material = materials.add(Color::srgb(0.3, 0.5, 0.9));
     let orange_material = materials.add(Color::srgb(0.9, 0.5, 0.2));
 
-    // Spawn a second physics world with low gravity.
-    let second_world = commands
-        .spawn((
-            PhysicsWorld,
-            Gravity(Vector::Y * -2.0),
-            Name::new("SecondPhysicsWorld"),
-        ))
-        .id();
-
     let cube_size = 1.0;
 
     // --- Left stack: default world (normal gravity, blue) ---
@@ -79,6 +70,14 @@ fn setup(
 
     // --- Right stack: second world (low gravity, orange) ---
     // These are children of the second_world entity.
+        // Spawn a second physics world with low gravity.
+    let second_world = commands
+        .spawn((
+            PhysicsWorld,
+            Gravity(Vector::Y * -2.0),
+            Name::new("SecondPhysicsWorld"),
+        ))
+        .id();
 
     // Ground
     commands.spawn((
