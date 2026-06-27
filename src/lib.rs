@@ -560,7 +560,7 @@ pub mod prelude {
         spatial_query::{self, *},
         world::{
             MainPhysicsWorld, MainPhysicsWorldEntity, PhysicsWorld, PhysicsWorldLookup,
-            PhysicsWorldPlugin,
+            PhysicsWorldPlugin, TransferToWorld, WorldTransferred,
         },
     };
 
