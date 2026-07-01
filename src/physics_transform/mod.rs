@@ -13,6 +13,7 @@ pub use helper::PhysicsTransformHelper;
 #[cfg(test)]
 mod tests;
 
+use bevy_math::ToPrecision;
 use crate::{
     prelude::*,
     schedule::{LastPhysicsTick, is_changed_after_tick},
@@ -398,10 +399,10 @@ pub fn position_to_transform(
             if let Ok((parent_transform, parent_pos, parent_rot)) = parents.get(parent) {
                 // Compute the parent's physics-space transform using Position/Rotation if available,
                 // falling back to the parent's local Transform.
-                let parent_pos =
-                    parent_pos.map_or(parent_transform.translation, |pos| pos.f32());
-                let parent_rot =
-                    parent_rot.map_or(parent_transform.rotation, |rot| rot.f32());
+                let parent_pos = parent_pos
+                    .map_or(parent_transform.translation, |pos| pos.f32().to_precision());
+                let parent_rot = parent_rot
+                    .map_or(parent_transform.rotation, |rot| rot.f32().to_precision());
                 let parent_scale = parent_transform.scale;
                 let parent_t = Transform::from_translation(parent_pos)
                     .with_rotation(parent_rot)
@@ -409,7 +410,8 @@ pub fn position_to_transform(
 
                 // Compute local transform: inverse(parent) * child_global
                 let new_transform = GlobalTransform::from(
-                    Transform::from_translation(pos.f32()).with_rotation(rot.f32()),
+                    Transform::from_translation(pos.f32().to_precision())
+                        .with_rotation(rot.f32().to_precision()),
                 )
                 .reparented_to(&GlobalTransform::from(parent_t));
 
@@ -417,8 +419,8 @@ pub fn position_to_transform(
                 transform.rotation = new_transform.rotation;
             }
         } else {
-            transform.translation = pos.f32();
-            transform.rotation = rot.f32();
+            transform.translation = pos.f32().to_precision();
+            transform.rotation = rot.f32().to_precision();
         }
     }
 }

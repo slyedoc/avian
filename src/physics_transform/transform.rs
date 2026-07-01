@@ -2,6 +2,7 @@
 
 #![allow(clippy::unnecessary_cast)]
 
+use bevy_math::ToPrecision;
 use crate::{physics_transform::PhysicsTransformConfig, prelude::*};
 use bevy::{
     ecs::{lifecycle::HookContext, world::DeferredWorld},
@@ -1187,7 +1188,8 @@ pub(crate) fn init_physics_transform(world: &mut DeferredWorld, ctx: &HookContex
                 };
             #[cfg(feature = "3d")]
             let new_transform = GlobalTransform::from(
-                Transform::from_translation(position.f32()).with_rotation(rotation.f32()),
+                Transform::from_translation(position.f32().to_precision())
+                    .with_rotation(rotation.f32().to_precision()),
             )
             .reparented_to(&parent_global_transform);
 
@@ -1210,10 +1212,10 @@ pub(crate) fn init_physics_transform(world: &mut DeferredWorld, ctx: &HookContex
             #[cfg(feature = "3d")]
             {
                 if !is_pos_placeholder {
-                    transform.translation = position.f32();
+                    transform.translation = position.f32().to_precision();
                 }
                 if !is_rot_placeholder {
-                    transform.rotation = rotation.f32();
+                    transform.rotation = rotation.f32().to_precision();
                 }
             }
         }

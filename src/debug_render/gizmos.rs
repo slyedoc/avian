@@ -1,5 +1,6 @@
 #![allow(clippy::unnecessary_cast)]
 
+use bevy_math::ToPrecision;
 use crate::prelude::*;
 use bevy::prelude::*;
 #[cfg(all(
@@ -199,7 +200,8 @@ impl PhysicsGizmoExt for Gizmos<'_, '_, PhysicsGizmos> {
 
                 self.aabb_3d(
                     Aabb3d::new(Vec3A::ZERO, s.half_extents.f32()),
-                    Transform::from_translation(position.f32()).with_rotation(rotation.f32()),
+                    Transform::from_translation(position.f32().to_precision())
+                        .with_rotation(rotation.f32().to_precision()),
                     color,
                 );
             }
