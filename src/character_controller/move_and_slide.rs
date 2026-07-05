@@ -84,7 +84,6 @@ pub struct MoveAndSlide<'w, 's> {
     /// A units-per-meter scaling factor that adjusts some thresholds and tolerances
     /// to the scale of the world for better behavior.
     pub length_unit: Query<'w, 's, &'static PhysicsLengthUnit, With<PhysicsWorld>>,
-    main_world: Res<'w, MainPhysicsWorldEntity>,
 }
 
 /// Configuration for [`MoveAndSlide::move_and_slide`].
@@ -396,6 +395,12 @@ impl MoveHitData {
 }
 
 impl<'w, 's> MoveAndSlide<'w, 's> {
+    /// Selects which [`PhysicsWorld`] this character's casts run against. Forwards to
+    /// [`SpatialQuery::set_world`]; call before moving a character in a non-main world.
+    pub fn set_world(&mut self, world: Entity) {
+        self.spatial_query.set_world(world);
+    }
+
     /// Moves a shape along a given velocity vector, sliding along any colliders that are hit on the way.
     ///
     /// See [`MoveAndSlide`] for an overview of the algorithm.
@@ -505,7 +510,7 @@ impl<'w, 's> MoveAndSlide<'w, 's> {
                 delta_time.as_secs_f64()
             }
         };
-        let skin_width = self.length_unit.get(self.main_world.0).unwrap().0 * config.skin_width;
+        let skin_width = self.length_unit.get(self.spatial_query.world()).unwrap().0 * config.skin_width;
 
         // Initial depenetration pass
         let depenetration_offset =
@@ -921,12 +926,12 @@ impl<'w, 's> MoveAndSlide<'w, 's> {
             shape,
             shape_position,
             shape_rotation,
-            self.length_unit.get(self.main_world.0).unwrap().0 * config.skin_width,
+            self.length_unit.get(self.spatial_query.world()).unwrap().0 * config.skin_width,
             filter,
             |_, contact_point, normal| {
                 intersections.push((
                     normal,
-                    contact_point.penetration + self.length_unit.get(self.main_world.0).unwrap().0 * config.skin_width,
+                    contact_point.penetration + self.length_unit.get(self.spatial_query.world()).unwrap().0 * config.skin_width,
                 ));
                 true
             },
@@ -1029,7 +1034,7 @@ impl<'w, 's> MoveAndSlide<'w, 's> {
             let mut total_error = 0.0;
 
             for (normal, dist) in intersections {
-                if *dist > self.length_unit.get(self.main_world.0).unwrap().0 * config.penetration_rejection_threshold {
+                if *dist > self.length_unit.get(self.spatial_query.world()).unwrap().0 * config.penetration_rejection_threshold {
                     continue;
                 }
                 let normal = normal.adjust_precision();
@@ -1038,7 +1043,7 @@ impl<'w, 's> MoveAndSlide<'w, 's> {
                 fixup += error * normal;
             }
 
-            if total_error < self.length_unit.get(self.main_world.0).unwrap().0 * config.max_depenetration_error {
+            if total_error < self.length_unit.get(self.spatial_query.world()).unwrap().0 * config.max_depenetration_error {
                 break;
             }
         }

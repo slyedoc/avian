@@ -62,12 +62,30 @@ pub struct SpatialQuery<'w, 's> {
     aabbs: Query<'w, 's, &'static ColliderAabb>,
     collider_trees: Query<'w, 's, &'static ColliderTrees, With<PhysicsWorld>>,
     main_world: Res<'w, MainPhysicsWorldEntity>,
+    /// Which world subsequent queries run against; `None` = the main world.
+    active_world: Local<'s, Option<Entity>>,
 }
 
 impl SpatialQuery<'_, '_> {
+    /// Selects which [`PhysicsWorld`] subsequent queries run against. Casts then operate in
+    /// that world's frame-local space (its colliders' [`Position`]/[`Rotation`]).
+    pub fn set_world(&mut self, world: Entity) {
+        *self.active_world = Some(world);
+    }
+
+    /// Resets queries to the [`MainPhysicsWorld`](crate::world::MainPhysicsWorld).
+    pub fn reset_world(&mut self) {
+        *self.active_world = None;
+    }
+
+    /// The world queries currently run against (the one set via [`set_world`](Self::set_world)
+    /// or the main world).
+    pub(crate) fn world(&self) -> Entity {
+        self.active_world.unwrap_or(self.main_world.0)
+    }
+
     fn trees(&self) -> &ColliderTrees {
-        // TODO: Support querying specific worlds.
-        self.collider_trees.get(self.main_world.0).unwrap()
+        self.collider_trees.get(self.world()).unwrap()
     }
 
     /// Casts a [ray](spatial_query#raycasting) and computes the closest [hit](RayHitData) with a collider.
