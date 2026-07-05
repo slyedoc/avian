@@ -28,10 +28,9 @@ const STATION_B_CELL: i32 = 1_000_000;
 
 fn main() {
     App::new()
-        // `AvianSolariPlugin` makes every PhysicsWorld a solari reference frame (the
-        // stations' bodies ride their anchor's pose) and rebases the camera on a frame
-        // handoff. The anchors below carry only a `SolariGridCell` — `SolariFrame` is
-        // auto-required by the plugin.
+        // Every PhysicsWorld is a solari reference frame (the stations' bodies ride
+        // their anchor's pose — the GPU frontier re-walks moved subtrees automatically);
+        // `AvianSolariPlugin` rebases the camera on a frame handoff.
         .add_plugins((
             DefaultPlugins,
             SolariPlugin,

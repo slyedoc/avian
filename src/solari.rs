@@ -6,18 +6,16 @@
 //! never names avian. [`AvianSolariPlugin`] is the single bridge between the two.
 
 use bevy::prelude::*;
-use bevy::solari::prelude::{CameraReframe, SolariCamera, SolariFrame};
+use bevy::solari::prelude::{CameraReframe, SolariCamera};
 
-use crate::world::{PhysicsWorld, WorldTransferred};
+use crate::world::WorldTransferred;
 
 /// Wires avian's multi-world model to `bevy_solari`'s reference frames.
 ///
-/// - Registers [`SolariFrame`] as a **required component** of [`PhysicsWorld`], so every
-///   physics world is automatically a solari reference frame: its descendants (the bodies)
-///   ride its pose on the GPU transform table, and a moving world re-walks its subtree.
-///   You still author each world's big offset with `SolariGridCell` (or a plain
-///   `Transform`) — `SolariFrame` is just the marker that makes the world a frame.
-/// - Adds an observer that, on a [`WorldTransferred`] **of the camera**, writes a
+/// Every physics world is automatically a solari reference frame: its descendants (the
+/// bodies) ride its pose on the GPU transform table, and a moving world's subtree is
+/// re-walked by the GPU frontier — no marker needed. This plugin's one job is the camera
+/// handoff: an observer that, on a [`WorldTransferred`] **of the camera**, writes a
 ///   [`CameraReframe`] from the source and destination world anchors' poses, so the
 ///   renderer re-expresses last frame's view-projection in the new origin basis
 ///   (motion-vector-continuous handoff) instead of dropping temporal history at the jump.
@@ -29,10 +27,6 @@ pub struct AvianSolariPlugin;
 
 impl Plugin for AvianSolariPlugin {
     fn build(&self, app: &mut App) {
-        // Every PhysicsWorld is a solari frame. Registered before any world is spawned
-        // (plugin build runs before startup), so MainPhysicsWorld and authored worlds
-        // both pick it up.
-        app.register_required_components::<PhysicsWorld, SolariFrame>();
         app.add_observer(reframe_camera_on_world_transfer);
     }
 }
