@@ -90,7 +90,7 @@ bevy = { git = "https://github.com/bevyengine/bevy", branch = "main", default-fe
 ] }
 bevy_math = { git = "https://github.com/bevyengine/bevy", branch = "main", features = ["approx"] }
 glam_matrix_extras = { git = "https://github.com/slyedoc/glam_matrix_extras", branch = "aurora", features = ["bevy_reflect"] }
-bevy_heavy = { git = "https://github.com/slyedoc/bevy_heavy", branch = "bevy-main" }
+bevy_heavy = { git = "https://github.com/slyedoc/bevy_heavy", branch = "aurora" }
 bevy_transform_interpolation = { git = "https://github.com/slyedoc/bevy_transform_interpolation", branch = "aurora" }
 libm = { version = "0.2", optional = true }
 approx = "0.5"
@@ -109,7 +109,7 @@ disqualified = { version = "1.0" }
 [dev-dependencies]
 examples_common_3d = { path = "../examples_common_3d" }
 bevy = { git = "https://github.com/bevyengine/bevy", branch = "main", features = ["3d", "ui", "https", "bevy_feathers", "bevy_solari", "cluster_processor"] }
-bevy_heavy = { git = "https://github.com/slyedoc/bevy_heavy", branch = "bevy-main", features = ["approx"] }
+bevy_heavy = { git = "https://github.com/slyedoc/bevy_heavy", branch = "aurora", features = ["approx"] }
 criterion = { version = "0.8", features = ["html_reports"] }
 bevy_mod_debugdump = { git = "https://github.com/slyedoc/bevy_mod_debugdump", branch = "bevy-main" }
 rand = "0.10"
