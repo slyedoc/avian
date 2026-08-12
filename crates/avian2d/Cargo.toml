@@ -82,7 +82,7 @@ bevy = { git = "https://github.com/bevyengine/bevy", branch = "main", default-fe
     "bevy_log",
 ] }
 bevy_math = { git = "https://github.com/bevyengine/bevy", branch = "main", features = ["approx"] }
-glam_matrix_extras = { git = "https://github.com/slyedoc/glam_matrix_extras", branch = "bevy-main", features = ["bevy_reflect"] }
+glam_matrix_extras = { git = "https://github.com/slyedoc/glam_matrix_extras", branch = "aurora", features = ["bevy_reflect"] }
 bevy_heavy = { git = "https://github.com/slyedoc/bevy_heavy", branch = "bevy-main" }
 bevy_transform_interpolation = { git = "https://github.com/slyedoc/bevy_transform_interpolation", branch = "bevy-main" }
 libm = { version = "0.2", optional = true }
