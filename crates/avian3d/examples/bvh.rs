@@ -21,7 +21,7 @@ use bevy::{
     text::FontSourceTemplate,
     ui::Checked,
     ui_widgets::{
-        RadioButton, RadioGroup, SliderPrecision, SliderStep, ValueChange, slider_self_update,
+        RadioButton, RadioGroup, SliderPrecision, SliderStep, SliderValue, ValueChange, slider_self_update,
     },
 };
 use examples_common_3d::ExampleCommonPlugin;
@@ -355,8 +355,8 @@ fn setup_ui(mut commands: Commands, settings: Res<BvhExampleSettings>) {
                         @FeathersSlider {
                             @min: 0.0,
                             @max: 1.0,
-                            @value: {settings.move_fraction},
                         }
+                        SliderValue({settings.move_fraction})
                         SliderStep(0.05)
                         SliderPrecision(2)
                         on(slider_self_update)
@@ -387,8 +387,8 @@ fn setup_ui(mut commands: Commands, settings: Res<BvhExampleSettings>) {
                         @FeathersSlider {
                             @min: 0.0,
                             @max: 1.0,
-                            @value: {settings.delta_fraction},
                         }
+                        SliderValue({settings.delta_fraction})
                         SliderStep(0.05)
                         SliderPrecision(2)
                         on(slider_self_update)
