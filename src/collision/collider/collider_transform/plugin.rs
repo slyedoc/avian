@@ -2,6 +2,7 @@ use crate::{
     ancestor_marker::{AncestorMarker, AncestorMarkerPlugin},
     physics_transform::PhysicsTransformSystems,
     prelude::*,
+    utils::{MIN_PAR_ITER_ENTITIES, ParallelQueryForEach},
 };
 use bevy::{
     ecs::{intern::Interned, schedule::ScheduleLabel},
@@ -81,16 +82,14 @@ pub(crate) fn update_child_collider_position(
             continue;
         };
 
-        position.0 = rb_pos.0 + rb_rot * collider_transform.translation;
+        position.0 = rb_pos.0 + (rb_rot * collider_transform.translation).real();
         #[cfg(feature = "2d")]
         {
-            *rotation = *rb_rot * collider_transform.rotation;
+            *rotation = (Rot2::from(*rb_rot) * collider_transform.rotation).into();
         }
         #[cfg(feature = "3d")]
         {
-            *rotation = (rb_rot.0 * collider_transform.rotation.0)
-                .normalize()
-                .into();
+            *rotation = (rb_rot.0 * collider_transform.rotation).normalize().into();
         }
     }
 }
@@ -120,7 +119,8 @@ pub(crate) fn propagate_collider_transforms(
     >,
     parent_query: Query<(Entity, Ref<Transform>, Has<RigidBody>, Ref<ChildOf>), ShouldPropagate>,
 ) {
-    root_query.par_iter_mut().for_each(
+    root_query.par_for_each_mut(
+        MIN_PAR_ITER_ENTITIES,
         |(entity, transform, children)| {
             for (child, child_transform, is_child_rb, child_of) in parent_query.iter_many(children) {
                 assert_eq!(
@@ -267,7 +267,7 @@ unsafe fn propagate_collider_transforms_recursive(
                         #[cfg(feature = "2d")]
                         rotation: transform.rotation * child_transform.rotation,
                         #[cfg(feature = "3d")]
-                        rotation: Rotation(transform.rotation.0 * child_transform.rotation.0),
+                        rotation: transform.rotation * child_transform.rotation,
                         scale,
                     }
                 },
