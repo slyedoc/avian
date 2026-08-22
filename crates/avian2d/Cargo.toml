@@ -83,8 +83,8 @@ bevy_heavy = { git = "https://github.com/slyedoc/bevy_heavy", branch = "bevy-mai
 bevy_transform_interpolation = { git = "https://github.com/slyedoc/bevy_transform_interpolation", branch = "bevy-main" }
 libm = { version = "0.2", optional = true }
 approx = "0.5"
-parry2d = { version = "0.27", optional = true }
-parry2d-f64 = { version = "0.27", optional = true }
+parry2d = { version = "0.28", optional = true }
+parry2d-f64 = { version = "0.28", optional = true }
 obvhs = { version = "0.3" }
 serde = { version = "1", features = ["derive"], optional = true }
 derive_more = "2"
@@ -100,7 +100,7 @@ disqualified = { version = "1.0" }
 examples_common_2d = { path = "../examples_common_2d" }
 bevy = { git = "https://github.com/bevyengine/bevy", branch = "main", default-features = false, features = ["2d", "ui"] }
 bevy_heavy = { git = "https://github.com/slyedoc/bevy_heavy", branch = "bevy-main", features = ["approx"] }
-glam = { version = "0.32", features = ["bytemuck"] }
+glam = { version = "0.33", features = ["bytemuck"] }
 bytemuck = "1.19"
 criterion = { version = "0.8", features = ["html_reports"] }
 bevy_mod_debugdump = { git = "https://github.com/slyedoc/bevy_mod_debugdump", branch = "bevy-main" }
