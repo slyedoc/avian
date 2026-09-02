@@ -86,7 +86,7 @@ fn setup(
     let second_world = commands
         .spawn((
             PhysicsWorld,
-            Gravity(Vector::Y * -2.0),
+            Gravity(Vec3::Y * -2.0),
             Name::new("SecondPhysicsWorld"),
         ))
         .id();
