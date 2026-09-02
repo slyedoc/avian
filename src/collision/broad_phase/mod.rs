@@ -79,8 +79,8 @@
 //! fn collect_collision_pairs(
 //!     colliders: Query<(Entity, &ColliderAabb, &CollisionLayers, &ColliderOf)>,
 //!     bodies: Query<&RigidBody>,
-//!     mut contact_graph: ResMut<ContactGraph>,
-//!     joint_graph: Res<JointGraph>,
+//!     mut contact_graph: Single<&mut ContactGraph>,
+//!     joint_graph: Single<&JointGraph>,
 //! ) {
 //!     // Loop through all entity combinations and create contact pairs for overlapping AABBs.
 //!     for [

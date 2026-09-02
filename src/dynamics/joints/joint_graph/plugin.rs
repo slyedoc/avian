@@ -39,8 +39,7 @@ impl<T: Component + EntityConstraint<2>> Plugin for JointGraphPlugin<T> {
         let already_initialized = app
             .world()
             .is_resource_added::<JointGraphPluginInitialized>();
-
-        app.init_resource::<JointGraph>();
+        // JointGraph lives on the PhysicsWorld entity.
         app.add_message::<JointGraphChange>();
         app.init_resource::<JointGraphPluginInitialized>();
 
@@ -127,7 +126,7 @@ fn add_joint_to_graph<
 >(
     trigger: On<E>,
     query: Query<(&T, Has<JointCollisionDisabled>), F>,
-    mut joint_graph: ResMut<JointGraph>,
+    mut joint_graph: Single<&mut JointGraph>,
     mut joint_graph_changes: MessageWriter<JointGraphChange>,
     #[cfg(feature = "xpbd_joints")] mut commands: Commands,
 ) {
@@ -155,7 +154,7 @@ fn add_joint_to_graph<
 
 fn remove_joint_from_graph<E: EventPattern<Event: EntityEvent>>(
     trigger: On<E>,
-    mut joint_graph: ResMut<JointGraph>,
+    mut joint_graph: Single<&mut JointGraph>,
     mut joint_graph_changes: MessageWriter<JointGraphChange>,
     #[cfg(feature = "xpbd_joints")] mut commands: Commands,
 ) {
@@ -236,8 +235,8 @@ fn on_remove_joint(mut world: DeferredWorld, ctx: HookContext) {
 fn on_disable_joint_collision(
     trigger: On<Add<JointCollisionDisabled>>,
     query: Query<&RigidBodyColliders>,
-    joint_graph: Res<JointGraph>,
-    mut contact_graph: ResMut<ContactGraph>,
+    joint_graph: Single<&JointGraph>,
+    mut contact_graph: Single<&mut ContactGraph>,
     mut contact_status_changes: ResMut<ContactStatusChangeQueue>,
 ) {
     let entity = trigger.entity;
@@ -289,7 +288,7 @@ fn on_disable_joint_collision(
 /// Update the joint graph when the entities of a joint change.
 fn on_change_joint_entities<T: Component + EntityConstraint<2>>(
     query: Query<(Entity, &T), Changed<T>>,
-    mut joint_graph: ResMut<JointGraph>,
+    mut joint_graph: Single<&mut JointGraph>,
     mut joint_graph_changes: MessageWriter<JointGraphChange>,
     #[cfg(feature = "xpbd_joints")] mut commands: Commands,
 ) {

@@ -17,7 +17,7 @@
 //!
 //! [`ContactConstraint`]: dynamics::solver::contact::ContactConstraint
 
-mod system_param;
+pub(crate) mod system_param;
 use system_param::ContactStatusBits;
 #[cfg(feature = "parallel")]
 use system_param::NarrowPhaseThreadLocals;
@@ -85,13 +85,9 @@ where
     fn build(&self, app: &mut App) {
         let already_initialized = app.world().is_resource_added::<NarrowPhaseInitialized>();
 
-        app.init_resource::<NarrowPhaseConfig>()
-            .init_resource::<ContactGraph>()
-            .init_resource::<JointGraph>()
-            .init_resource::<ContactStatusBits>()
-            .init_resource::<ContactStatusChangeQueue>()
-            .init_resource::<DefaultFriction>()
-            .init_resource::<DefaultRestitution>();
+        // Per-world graph/config state lives on the PhysicsWorld entity; only the
+        // status-change queue (drained every step) stays global for now.
+        app.init_resource::<ContactStatusChangeQueue>();
 
         #[cfg(feature = "parallel")]
         app.init_resource::<NarrowPhaseThreadLocals>();
@@ -254,7 +250,7 @@ fn update_narrow_phase<C: AnyCollider, H: CollisionHooks + 'static>(
     hooks: StaticSystemParam<H>,
     context: StaticSystemParam<C::Context>,
     mut commands: ParallelCommands,
-    mut diagnostics: ResMut<CollisionDiagnostics>,
+    mut diagnostics: Single<&mut CollisionDiagnostics>,
 ) where
     for<'w, 's> SystemParamItem<'w, 's, H>: CollisionHooks,
 {
@@ -434,7 +430,7 @@ fn remove_body_on<E: EventPattern<Event: EntityEvent>>(
     mut colliding_entities_query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
     mut contact_status_changes: ResMut<ContactStatusChangeQueue>,
-    mut contact_graph: ResMut<ContactGraph>,
+    mut contact_graph: Single<&mut ContactGraph>,
 ) {
     let Ok(colliders) = body_collider_query.get(trigger.event_target()) else {
         return;
@@ -458,7 +454,7 @@ fn remove_body_on<E: EventPattern<Event: EntityEvent>>(
 /// wakes up the other body, and writes a [`CollisionEnd`] event.
 fn remove_collider_on<E: EventPattern<Event: EntityEvent>>(
     trigger: On<E>,
-    mut contact_graph: ResMut<ContactGraph>,
+    mut contact_graph: Single<&mut ContactGraph>,
     mut contact_status_changes: ResMut<ContactStatusChangeQueue>,
     mut query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
@@ -481,7 +477,7 @@ fn on_body_remove_rigid_body_disabled(
     trigger: On<Remove<RigidBodyDisabled>>,
     body_collider_query: Query<&RigidBodyColliders>,
     mut contact_status_changes: ResMut<ContactStatusChangeQueue>,
-    mut contact_graph: ResMut<ContactGraph>,
+    mut contact_graph: Single<&mut ContactGraph>,
     mut colliding_entities_query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {
@@ -506,7 +502,7 @@ fn on_disable_body(
     trigger: On<Add<(Disabled, RigidBodyDisabled)>>,
     body_collider_query: Query<&RigidBodyColliders, Allow<Disabled>>,
     mut contact_status_changes: ResMut<ContactStatusChangeQueue>,
-    mut contact_graph: ResMut<ContactGraph>,
+    mut contact_graph: Single<&mut ContactGraph>,
     mut colliding_entities_query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {
@@ -533,7 +529,7 @@ fn on_disable_body(
 fn on_add_sensor(
     trigger: On<Add<Sensor>>,
     mut contact_status_changes: ResMut<ContactStatusChangeQueue>,
-    mut contact_graph: ResMut<ContactGraph>,
+    mut contact_graph: Single<&mut ContactGraph>,
     mut colliding_entities_query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {
@@ -551,7 +547,7 @@ fn on_add_sensor(
 fn on_remove_sensor(
     trigger: On<Remove<Sensor>>,
     mut contact_status_changes: ResMut<ContactStatusChangeQueue>,
-    mut contact_graph: ResMut<ContactGraph>,
+    mut contact_graph: Single<&mut ContactGraph>,
     mut colliding_entities_query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {

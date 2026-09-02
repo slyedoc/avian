@@ -42,7 +42,7 @@ use super::{ContactEdge, ContactId};
 /// #[derive(Component)]
 /// struct PressurePlate;
 ///
-/// fn activate_pressure_plates(mut query: Query<Entity, With<PressurePlate>>, contact_graph: Res<ContactGraph>) {
+/// fn activate_pressure_plates(mut query: Query<Entity, With<PressurePlate>>, contact_graph: Single<&ContactGraph>) {
 ///     for pressure_plate in &query {
 ///         // Compute the total impulse applied to the pressure plate.
 ///         let mut total_impulse = 0.0;

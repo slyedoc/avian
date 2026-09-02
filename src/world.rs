@@ -17,9 +17,8 @@ use bevy::{
 
 #[cfg(feature = "bevy_diagnostic")]
 use crate::diagnostics::{PhysicsEntityDiagnostics, PhysicsTotalDiagnostics};
-#[cfg(feature = "parallel")]
-use crate::collision::narrow_phase::system_param::ThreadLocalContactStatusBits;
 use crate::{
+    dynamics::joints::joint_graph::JointGraph,
     collider_tree::{
         optimization::OptimizationTasks,
         update::LastDynamicKinematicAabbUpdate,
@@ -36,7 +35,6 @@ use crate::{
             constraint_graph::ConstraintGraph,
             islands::{BodyIslandNode, IslandId, PhysicsIslands, sleeping::{AwakeIslandBitVec, WakeIslands}},
             SolverDiagnostics,
-            joint_graph::JointGraph,
             ContactConstraints, ContactSoftnessCoefficients, SolverConfig,
         },
     },
@@ -85,7 +83,6 @@ use crate::{
     ColliderTreeDiagnostics,
     SpatialQueryDiagnostics,
 )]
-#[cfg_attr(feature = "parallel", require(ThreadLocalContactStatusBits))]
 #[cfg_attr(feature = "bevy_diagnostic", require(PhysicsTotalDiagnostics, PhysicsEntityDiagnostics))]
 pub struct PhysicsWorld;
 
@@ -249,7 +246,7 @@ pub struct WorldTransferred {
 /// 6. Wakes sleeping islands in the target world
 #[allow(clippy::type_complexity)]
 fn on_transfer_to_world(
-    trigger: On<TransferToWorld, ()>,
+    trigger: On<TransferToWorld>,
     mut collider_keys: Query<(
         &mut ColliderTreeProxyKey,
         Option<&RigidBodyColliders>,
