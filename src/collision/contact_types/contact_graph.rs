@@ -72,7 +72,7 @@ use super::{ContactEdge, ContactId};
 /// wake up the entities involved, or perform any other cleanup. Only make structural modifications if you know what you are doing.
 ///
 /// For filtering and modifying collisions, consider using [`CollisionHooks`] instead.
-#[derive(Resource, Clone, Debug, Default)]
+#[derive(Component, Clone, Debug, Default)]
 pub struct ContactGraph {
     // TODO: Can and should edges be between bodies instead of colliders?
     // TODO: We could have a separate intersection graph for sensors.

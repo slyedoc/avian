@@ -5,8 +5,8 @@ use bevy::{
 
 use super::{SolverBodies, SolverBody, SolverBodyIndex, SolverBodyInertia};
 use crate::{
-    AngularVelocity, LinearVelocity, PhysicsSchedule, Position, RigidBody, RigidBodyActiveFilter,
-    RigidBodyDisabled, Rot, Rotation, Sleeping, SolverSystems, Vector,
+    AngularVelocity, LinearVelocity, PhysicsSchedule, PhysicsWorld, Position, RigidBody,
+    RigidBodyActiveFilter, RigidBodyDisabled, Rot, Rotation, Sleeping, SolverSystems, Vector,
     dynamics::{
         integrator::CustomPositionIntegration,
         solver::{SolverDiagnostics, solver_body::SolverBodyFlags},
@@ -338,7 +338,7 @@ fn writeback_solver_bodies(
         &mut LinearVelocity,
         &mut AngularVelocity,
     )>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
 ) {
     let start = bevy::platform::time::Instant::now();
 
@@ -364,7 +364,10 @@ fn writeback_solver_bodies(
         },
     );
 
-    diagnostics.finalize += start.elapsed();
+    let elapsed = start.elapsed();
+    for mut diagnostics in worlds.iter_mut() {
+        diagnostics.finalize += elapsed;
+    }
 }
 
 #[cfg(feature = "3d")]

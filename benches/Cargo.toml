@@ -37,6 +37,13 @@ clap = { version = "4.6", features = ["derive"] }
 # Miscellaneous
 rayon = { version = "1.12" }
 
+[patch.crates-io]
+parry3d = { git = "https://github.com/slyedoc/parry", branch = "bevy-main" }
+parry3d-f64 = { git = "https://github.com/slyedoc/parry", branch = "bevy-main" }
+parry2d = { git = "https://github.com/slyedoc/parry", branch = "bevy-main" }
+parry2d-f64 = { git = "https://github.com/slyedoc/parry", branch = "bevy-main" }
+glamx = { git = "https://github.com/slyedoc/glamx", branch = "bevy-main" }
+
 [profile.dev]
 # Make the `dev` profile equivalent to the `release` profile
 # so that benchmarks are more realistic even without `--release`.

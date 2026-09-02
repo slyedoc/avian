@@ -552,6 +552,8 @@ pub mod picking;
 pub mod schedule;
 pub mod spatial_query;
 
+pub mod world;
+
 pub mod data_structures;
 
 // TODO: Where should this go?
@@ -582,6 +584,10 @@ pub mod prelude {
             PhysicsStepSystems, PhysicsSystems, PhysicsTime, Substeps,
         },
         spatial_query::{self, *},
+        world::{
+            MainPhysicsWorld, MainPhysicsWorldEntity, PhysicsWorld, PhysicsWorldLookup,
+            PhysicsWorldPlugin, TransferToWorld, WorldTransferred,
+        },
     };
 
     #[cfg(all(
@@ -601,6 +607,21 @@ mod utils;
 
 #[cfg(test)]
 mod tests;
+
+/// Test helper: set a per-world config component (`Gravity`, `SubstepCount`, …) on the
+/// auto-spawned [`MainPhysicsWorld`](crate::world::MainPhysicsWorld) entity. Replaces the
+/// old `insert_resource` calls now that physics config lives on the world entity.
+#[cfg(test)]
+pub(crate) fn set_main_world_component<T: bevy::prelude::Component>(
+    app: &mut bevy::prelude::App,
+    value: T,
+) {
+    let entity = app
+        .world()
+        .resource::<crate::world::MainPhysicsWorldEntity>()
+        .0;
+    app.world_mut().entity_mut(entity).insert(value);
+}
 
 use bevy::{
     app::PluginGroupBuilder,
@@ -783,6 +804,7 @@ impl Default for PhysicsPlugins {
 impl PluginGroup for PhysicsPlugins {
     fn build(self) -> PluginGroupBuilder {
         let builder = PluginGroupBuilder::start::<Self>()
+            .add(PhysicsWorldPlugin)
             .add(PhysicsSchedulePlugin::new(self.schedule))
             .add(MassPropertyPlugin::new(self.schedule))
             .add(ForcePlugin)

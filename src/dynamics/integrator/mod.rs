@@ -51,8 +51,6 @@ impl Plugin for IntegratorPlugin {
         // Add `VelocityIntegrationData` to all bodies that have a solver body.
         app.register_required_components::<SolverBodyIndex, VelocityIntegrationData>();
 
-        app.init_resource::<Gravity>();
-
         app.configure_sets(
             PhysicsSchedule,
             (
@@ -118,7 +116,7 @@ pub enum IntegrationSystems {
 #[deprecated(since = "0.4.0", note = "Renamed to `IntegrationSystems`")]
 pub type IntegrationSet = IntegrationSystems;
 
-/// A resource for the global gravitational acceleration.
+/// A component for the gravitational acceleration.
 ///
 /// The default is an acceleration of 9.81 m/s^2 pointing down, which is approximate to the gravitational
 /// acceleration near Earth's surface. Note that if you are using pixels as length units in 2D,
@@ -150,10 +148,10 @@ pub type IntegrationSet = IntegrationSystems;
 /// ```
 ///
 /// You can also modify gravity while the app is running.
-#[derive(Reflect, Resource, Debug)]
+#[derive(Reflect, Component, Debug)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, Resource)]
+#[reflect(Debug, Component)]
 pub struct Gravity(pub Vector);
 
 impl Default for Gravity {
@@ -260,6 +258,7 @@ impl VelocityIntegrationData {
 /// Applies gravity and locked axes to the linear and angular velocity increments of bodies.
 pub fn pre_process_velocity_increments(
     mut bodies: Query<(
+        Entity,
         &RigidBody,
         &mut VelocityIntegrationData,
         Option<&LinearDamping>,
@@ -267,21 +266,22 @@ pub fn pre_process_velocity_increments(
         Option<&GravityScale>,
         Option<&LockedAxes>,
     )>,
-    gravity: Res<Gravity>,
+    world_lookup: PhysicsWorldLookup,
+    mut worlds: Query<(Entity, &Gravity, &mut SolverDiagnostics), With<PhysicsWorld>>,
     time: Res<Time<Substeps>>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
 ) {
-    let start = crate::utils::Instant::now();
-
     let delta_secs = time.delta_secs();
 
-    // TODO: Do we want to skip kinematic bodies here?
-    bodies.par_for_each_mut(
-        MIN_PAR_ITER_ENTITIES,
-        |(rb, mut integration, lin_damping, ang_damping, gravity_scale, locked_axes)| {
-            if !rb.is_dynamic() {
-                // Skip non-dynamic bodies.
-                return;
+    // Per world: each world applies its own gravity to its member bodies.
+    for (world_entity, gravity, mut diagnostics) in worlds.iter_mut() {
+        let start = crate::utils::Instant::now();
+
+        // TODO: Do we want to skip kinematic bodies here?
+        for (entity, rb, mut integration, lin_damping, ang_damping, gravity_scale, locked_axes) in
+            bodies.iter_mut()
+        {
+            if world_lookup.world_entity_of(entity) != world_entity || !rb.is_dynamic() {
+                continue;
             }
 
             let locked_axes = locked_axes.map_or(LockedAxes::default(), |locked_axes| *locked_axes);
@@ -308,16 +308,16 @@ pub fn pre_process_velocity_increments(
             // Multiply by the time step to get the final velocity increments.
             integration.linear_increment *= delta_secs;
             integration.angular_increment *= delta_secs;
-        },
-    );
+        }
 
-    diagnostics.update_velocity_increments += start.elapsed();
+        diagnostics.update_velocity_increments += start.elapsed();
+    }
 }
 
 /// Clears the velocity increments of bodies after the substepping loop.
 fn clear_velocity_increments(
     mut bodies: Query<&mut VelocityIntegrationData, With<SolverBodyIndex>>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -326,7 +326,10 @@ fn clear_velocity_increments(
         integration.angular_increment = default();
     });
 
-    diagnostics.update_velocity_increments += start.elapsed();
+    let elapsed = start.elapsed();
+    for mut diagnostics in worlds.iter_mut() {
+        diagnostics.update_velocity_increments += elapsed;
+    }
 }
 
 #[derive(QueryData)]
@@ -348,7 +351,7 @@ pub fn integrate_velocities(
         VelocityIntegrationQuery,
         (RigidBodyActiveFilter, Without<CustomVelocityIntegration>),
     >,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
     #[cfg(feature = "3d")] time: Res<Time>,
 ) {
     let start = crate::utils::Instant::now();
@@ -395,7 +398,10 @@ pub fn integrate_velocities(
         }
     });
 
-    diagnostics.integrate_velocities += start.elapsed();
+    let elapsed = start.elapsed();
+    for mut diagnostics in worlds.iter_mut() {
+        diagnostics.integrate_velocities += elapsed;
+    }
 }
 
 /// Applies the effects of gyroscopic motion to the given angular velocity.
@@ -478,7 +484,7 @@ fn clamp_velocities(
         Query<(&SolverBodyIndex, &MaxLinearSpeed)>,
         Query<(&SolverBodyIndex, &MaxAngularSpeed)>,
     )>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -511,14 +517,17 @@ fn clamp_velocities(
         }
     });
 
-    diagnostics.integrate_velocities += start.elapsed();
+    let elapsed = start.elapsed();
+    for mut diagnostics in worlds.iter_mut() {
+        diagnostics.integrate_velocities += elapsed;
+    }
 }
 
 /// Integrates the positions of bodies based on their velocities and the time step.
 pub fn integrate_positions(
     mut bodies: ResMut<SolverBodies>,
     time: Res<Time>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -554,7 +563,10 @@ pub fn integrate_positions(
         }
     });
 
-    diagnostics.integrate_positions += start.elapsed();
+    let elapsed = start.elapsed();
+    for mut diagnostics in worlds.iter_mut() {
+        diagnostics.integrate_positions += elapsed;
+    }
 }
 
 #[cfg(test)]

@@ -42,9 +42,10 @@
 // The implementation is largely based on Box2D:
 // https://github.com/erincatto/box2d/blob/df9787b59e4480135fbd73d275f007b5d931a83f/src/island.c#L57
 
-mod sleeping;
+pub(crate) mod sleeping;
 pub use sleeping::{IslandSleepingPlugin, SleepBody, SleepIslands, WakeBody, WakeIslands};
 
+use crate::world::PhysicsWorld;
 use bevy::{
     ecs::{
         entity::{ComponentCloneCtx, SourceComponent},
@@ -75,7 +76,7 @@ pub struct IslandPlugin;
 
 impl Plugin for IslandPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PhysicsIslands>();
+        // PhysicsIslands is on the PhysicsWorld entity.
 
         // Insert `BodyIslandNode` for each body that has a solver body.
         app.register_required_components::<SolverBodyIndex, BodyIslandNode>();
@@ -160,21 +161,21 @@ impl Plugin for IslandPlugin {
 }
 
 fn split_island(
-    mut islands: ResMut<PhysicsIslands>,
+    mut worlds: Query<(&mut PhysicsIslands, &mut ContactGraph, &mut JointGraph), With<PhysicsWorld>>,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     body_colliders: Query<&RigidBodyColliders>,
-    contact_graph: Res<ContactGraph>,
-    joint_graph: Res<JointGraph>,
 ) {
-    // Splitting is only done when bodies want to sleep.
-    if let Some(island_id) = islands.split_candidate {
-        islands.split_island(
-            island_id,
-            &mut body_islands,
-            &body_colliders,
-            &contact_graph,
-            &joint_graph,
-        );
+    for (mut islands, contact_graph, joint_graph) in worlds.iter_mut() {
+        // Splitting is only done when bodies want to sleep.
+        if let Some(island_id) = islands.split_candidate {
+            islands.split_island(
+                island_id,
+                &mut body_islands,
+                &body_colliders,
+                &contact_graph,
+                &joint_graph,
+            );
+        }
     }
 }
 
@@ -414,7 +415,7 @@ impl PhysicsIsland {
 }
 
 /// A resource for the [`PhysicsIsland`]s in the simulation.
-#[derive(Resource, Debug, Default, Clone)]
+#[derive(Component, Debug, Default, Clone)]
 pub struct PhysicsIslands {
     /// The list of islands.
     islands: StableVec<PhysicsIsland>,
@@ -1394,8 +1395,9 @@ impl BodyIslandNode {
 
     // Initialize a new island when `BodyIslandNode` is added to a body.
     fn on_add(mut world: DeferredWorld, ctx: HookContext) {
-        // Create a new island for the body.
-        let mut islands = world.resource_mut::<PhysicsIslands>();
+        // Create a new island in the body's physics world.
+        let world_entity = crate::world::find_physics_world_or_main(&world, ctx.entity);
+        let mut islands = world.get_mut::<PhysicsIslands>(world_entity).unwrap();
         let island_id = islands.create_island_with(|island| {
             island.head_body = Some(ctx.entity);
             island.tail_body = Some(ctx.entity);
@@ -1405,6 +1407,18 @@ impl BodyIslandNode {
         // Set the island ID for the body.
         let mut body_island = world.get_mut::<BodyIslandNode>(ctx.entity).unwrap();
         body_island.island_id = island_id;
+
+        // Cache the physics world entity for O(1) lookup.
+        if let Some(mut cached) =
+            world.get_mut::<crate::world::PhysicsWorldEntity>(ctx.entity)
+        {
+            cached.0 = world_entity;
+        } else {
+            world
+                .commands()
+                .entity(ctx.entity)
+                .insert(crate::world::PhysicsWorldEntity(world_entity));
+        }
     }
 
     // Remove the body from the island when `BodyIslandNode` is removed.
@@ -1413,6 +1427,9 @@ impl BodyIslandNode {
         let island_id = body_island.island_id;
         let prev_body_entity = body_island.prev;
         let next_body_entity = body_island.next;
+
+        // Find the body's physics world.
+        let world_entity = crate::world::find_physics_world_or_main(&world, ctx.entity);
 
         // Fix the linked list of bodies in the island.
         if let Some(entity) = prev_body_entity {
@@ -1424,7 +1441,7 @@ impl BodyIslandNode {
             next_body_island.prev = prev_body_entity;
         }
 
-        let mut islands = world.resource_mut::<PhysicsIslands>();
+        let mut islands = world.get_mut::<PhysicsIslands>(world_entity).unwrap();
         let island = islands
             .get_mut(island_id)
             .unwrap_or_else(|| panic!("Island {island_id} does not exist"));
@@ -1461,11 +1478,13 @@ impl BodyIslandNode {
                         &BodyIslandNode,
                         Or<(With<Disabled>, Without<Disabled>)>,
                     >,
-                          islands: Res<PhysicsIslands>| {
-                        let island = islands
-                            .get(island_id)
-                            .unwrap_or_else(|| panic!("Island {island_id} does not exist"));
-                        island.validate(&bodies, islands.contact_nodes(), islands.joint_nodes());
+                          worlds: Query<&PhysicsIslands, With<PhysicsWorld>>| {
+                        for islands in worlds.iter() {
+                            let island = islands
+                                .get(island_id)
+                                .unwrap_or_else(|| panic!("Island {island_id} does not exist"));
+                            island.validate(&bodies, islands.contact_nodes(), islands.joint_nodes());
+                        }
                     },
                 );
             });

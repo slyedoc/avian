@@ -136,7 +136,7 @@ pub type TimeSleeping = SleepTimer;
 /// [`RigidBody`]: super::RigidBody
 /// [`LinearVelocity`]: super::LinearVelocity
 /// [`AngularVelocity`]: super::AngularVelocity
-#[derive(Resource, Clone, Copy, Debug, PartialEq, PartialOrd, Reflect)]
+#[derive(Component, Clone, Copy, Debug, PartialEq, PartialOrd, Reflect)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
 #[reflect(Debug, Default, PartialEq)]

@@ -214,7 +214,7 @@ fn apply_local_acceleration(
         (&SolverBodyIndex, &AccumulatedLocalAcceleration, &Rotation),
         Without<CustomVelocityIntegration>,
     >,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
     time: Res<Time<Substeps>>,
 ) {
     let start = crate::utils::Instant::now();
@@ -243,7 +243,10 @@ fn apply_local_acceleration(
         }
     });
 
-    diagnostics.integrate_velocities += start.elapsed();
+    let elapsed = start.elapsed();
+    for mut diagnostics in worlds.iter_mut() {
+        diagnostics.integrate_velocities += elapsed;
+    }
 }
 
 fn clear_accumulated_local_acceleration(

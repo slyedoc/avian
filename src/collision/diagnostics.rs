@@ -1,6 +1,6 @@
 use bevy::{
     diagnostic::DiagnosticPath,
-    prelude::{ReflectResource, Resource},
+    prelude::{Component, ReflectComponent},
     reflect::Reflect,
 };
 use core::time::Duration;
@@ -8,8 +8,8 @@ use core::time::Duration;
 use crate::diagnostics::{PhysicsDiagnostics, impl_diagnostic_paths};
 
 /// Diagnostics for collision detection.
-#[derive(Resource, Debug, Default, Reflect)]
-#[reflect(Resource, Debug)]
+#[derive(Component, Debug, Default, Reflect)]
+#[reflect(Component, Debug)]
 pub struct CollisionDiagnostics {
     /// Time spent finding potential collision pairs in the [broad phase](crate::collision::broad_phase).
     pub broad_phase: Duration,

@@ -6,6 +6,7 @@ use super::Benchmark3dPlugins;
 pub fn create_bench(base_count: usize, row_count: usize, column_count: usize) -> App {
     let mut app = App::new();
     app.add_plugins((Benchmark3dPlugins, PhysicsPlugins::default()));
+    super::set_component(&mut app, SubstepCount(4));
     app.add_systems(Startup, move |commands: Commands| {
         setup(commands, base_count, row_count, column_count);
     });
