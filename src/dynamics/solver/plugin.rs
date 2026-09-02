@@ -189,16 +189,18 @@ impl Plugin for SolverPlugin {
 /// Applies the [`ContactStatusChange`]s to the [`ConstraintGraph`] and [`PhysicsIslands`].
 pub fn apply_contact_status_changes(
     mut changes: ResMut<ContactStatusChangeQueue>,
-    contact_graph: Res<ContactGraph>,
-    mut constraint_graph: ResMut<ConstraintGraph>,
-    mut islands: Option<ResMut<PhysicsIslands>>,
+    contact_graph: Single<&ContactGraph>,
+    mut constraint_graph: Single<&mut ConstraintGraph>,
+    mut islands_query: Query<&mut PhysicsIslands>,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     mut commands: Commands,
+    main_world: Res<crate::world::MainPhysicsWorldEntity>,
 ) {
     if changes.is_empty() {
         return;
     }
 
+    let mut islands = islands_query.single_mut().ok();
     let mut islands_to_wake: Vec<IslandId> = Vec::new();
 
     for change in changes.drain(..) {
@@ -217,18 +219,20 @@ pub fn apply_contact_status_changes(
         islands_to_wake.dedup();
 
         // Wake up the islands that were previously sleeping.
-        commands.queue(WakeIslands(islands_to_wake));
+        commands.queue(WakeIslands { world_entity: main_world.0, islands: islands_to_wake });
     }
 }
 
 /// Applies [`JointGraphChange`] messages to [`PhysicsIslands`].
 pub fn apply_joint_graph_changes(
     mut changes: MessageReader<JointGraphChange>,
-    joint_graph: Res<JointGraph>,
-    mut islands: Option<ResMut<PhysicsIslands>>,
+    joint_graph: Single<&JointGraph>,
+    mut islands_query: Query<&mut PhysicsIslands>,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     mut commands: Commands,
+    main_world: Res<crate::world::MainPhysicsWorldEntity>,
 ) {
+    let mut islands = islands_query.single_mut().ok();
     let Some(islands) = &mut islands else {
         // Islands are not in use, so there is nothing to update.
         changes.clear();
@@ -275,7 +279,7 @@ pub fn apply_joint_graph_changes(
         islands_to_wake.dedup();
 
         // Wake up the islands that were previously sleeping.
-        commands.queue(WakeIslands(islands_to_wake));
+        commands.queue(WakeIslands { world_entity: main_world.0, islands: islands_to_wake });
     }
 }
 
@@ -367,9 +371,9 @@ fn apply_contact_status_change(
 struct CachedContactStatusChangeSystemState(
     SystemState<(
         ResMut<'static, ContactStatusChangeQueue>,
-        Res<'static, ContactGraph>,
-        ResMut<'static, ConstraintGraph>,
-        Option<ResMut<'static, PhysicsIslands>>,
+        Query<'static, 'static, &'static ContactGraph>,
+        Query<'static, 'static, &'static mut ConstraintGraph>,
+        Query<'static, 'static, &'static mut PhysicsIslands>,
         Query<
             'static,
             'static,
@@ -426,11 +430,14 @@ impl Command for FlushContactStatusChangeQueue {
                 {
                     let (
                         mut changes,
-                        contact_graph,
-                        mut constraint_graph,
-                        mut islands,
+                        contact_graph_query,
+                        mut constraint_graph_query,
+                        mut islands_query,
                         mut body_islands,
                     ) = state.0.get_mut(world).unwrap();
+                    let contact_graph = contact_graph_query.single().unwrap();
+                    let mut constraint_graph = constraint_graph_query.single_mut().unwrap();
+                    let mut islands = islands_query.single_mut().ok();
 
                     for change in changes.drain(..) {
                         apply_contact_status_change(
@@ -449,7 +456,11 @@ impl Command for FlushContactStatusChangeQueue {
                     islands_to_wake.dedup();
 
                     // Wake up the islands that were previously sleeping.
-                    WakeIslands(islands_to_wake).apply(world);
+                    WakeIslands {
+                        world_entity: world.resource::<crate::world::MainPhysicsWorldEntity>().0,
+                        islands: islands_to_wake,
+                    }
+                    .apply(world);
                 }
             },
         );

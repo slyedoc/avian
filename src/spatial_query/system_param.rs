@@ -910,7 +910,7 @@ impl SpatialQuery<'_, '_> {
         let mut closest_projection: Option<PointProjection> = None;
 
         self.trees().iter_trees().for_each(|tree| {
-            tree.squared_distance_traverse_closest(point, Scalar::INFINITY, |proxy_id| {
+            tree.squared_distance_traverse_closest(point, f32::INFINITY, |proxy_id| {
                 let proxy = tree.get_proxy(proxy_id).unwrap();
                 if !filter.test(proxy.collider, proxy.layers) || !predicate(proxy.collider) {
                     return f32::INFINITY;

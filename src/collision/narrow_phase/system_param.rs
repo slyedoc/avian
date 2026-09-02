@@ -72,22 +72,22 @@ pub struct NarrowPhase<'w, 's, C: AnyCollider> {
     collider_query: Query<'w, 's, ColliderQuery<C>, Without<ColliderDisabled>>,
     colliding_entities_query: Query<'w, 's, &'static mut CollidingEntities>,
     body_query: Query<'w, 's, RigidBodyQuery, Without<RigidBodyDisabled>>,
-    pub contact_graph: ResMut<'w, ContactGraph>,
+    pub contact_graph: Single<'w, 's, &'static mut ContactGraph>,
     /// The queue of contact status changess.
     pub contact_status_changes: ResMut<'w, ContactStatusChangeQueue>,
-    contact_status_bits: ResMut<'w, ContactStatusBits>,
+    contact_status_bits: Single<'w, 's, &'static mut ContactStatusBits>,
     #[cfg(feature = "parallel")]
     thread_locals: ResMut<'w, NarrowPhaseThreadLocals>,
-    pub config: Res<'w, NarrowPhaseConfig>,
-    default_friction: Res<'w, DefaultFriction>,
-    default_restitution: Res<'w, DefaultRestitution>,
-    length_unit: Res<'w, PhysicsLengthUnit>,
+    pub config: Single<'w, 's, &'static NarrowPhaseConfig>,
+    default_friction: Single<'w, 's, &'static DefaultFriction>,
+    default_restitution: Single<'w, 's, &'static DefaultRestitution>,
+    length_unit: Single<'w, 's, &'static PhysicsLengthUnit>,
 }
 
 /// A bit vector for tracking contact status changes.
 /// Set bits correspond to contact pairs that were either added or removed.
-#[derive(Resource, Default, Deref, DerefMut)]
-pub(super) struct ContactStatusBits(pub BitVec);
+#[derive(Component, Default, Deref, DerefMut)]
+pub(crate) struct ContactStatusBits(pub BitVec);
 
 /// Thread-local data for the narrow phase contact updates.
 #[cfg(feature = "parallel")]

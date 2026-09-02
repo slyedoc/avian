@@ -214,7 +214,7 @@ pub fn transform_to_position(
     // If the translation and `Position` differ by less than 0.01 mm, we ignore the change.
     let distance_tolerance = length_unit.0 * 1e-5;
     // If the rotation and `Rotation` differ by less than 0.1 degrees, we ignore the change.
-    let rotation_tolerance = (0.1 as Scalar).to_radians();
+    let rotation_tolerance = 0.1f32.to_radians();
 
     for (_entity, transform, child_of, mut position, mut rotation) in &mut query {
         // Compose transforms up the hierarchy to the PhysicsWorld ancestor,
@@ -225,50 +225,28 @@ pub fn transform_to_position(
         let transform_translation = composed_translation;
         let transform_rotation = Rotation::from(composed_rotation);
 
-    query.par_for_each_mut(
-        MIN_PAR_ITER_ENTITIES,
-        |(global_transform, mut position, mut rotation)| {
-            let transform_changed = global_transform.is_added()
-                || is_changed_after_tick(global_transform, last_physics_tick, this_run);
-            if !transform_changed {
-                return;
-            }
+        let position_changed = !position.is_added()
+            && is_changed_after_tick(
+                Ref::from(position.reborrow()),
+                last_physics_tick.0,
+                this_run,
+            );
+        if !position_changed && position.abs_diff_ne(&transform_translation, distance_tolerance) {
+            position.0 = transform_translation;
+        }
 
-            let affine = global_transform.affine();
-
-            let position_changed = !position.is_added()
-                && is_changed_after_tick(
-                    Ref::from(position.reborrow()),
-                    last_physics_tick,
-                    this_run,
-                );
-            if !position_changed {
-                #[cfg(feature = "2d")]
-                let transform_translation = affine.translation.truncate().real();
-                #[cfg(feature = "3d")]
-                let transform_translation = Vec3::from(affine.translation).real();
-
-                if position.abs_diff_ne(&transform_translation, distance_tolerance) {
-                    position.0 = transform_translation;
-                }
-            }
-
-            let rotation_changed = !rotation.is_added()
-                && is_changed_after_tick(
-                    Ref::from(rotation.reborrow()),
-                    last_physics_tick,
-                    this_run,
-                );
-            if !rotation_changed {
-                let transform_rotation = rotation_from_affine(&affine);
-                // The rotations differ by more than the tolerance if the cosine of the angle
-                // between them is smaller than the cosine of the tolerance angle.
-                if cos_angle_between(*rotation, transform_rotation) < ROTATION_COS_TOLERANCE {
-                    *rotation = transform_rotation;
-                }
-            }
-        },
-    );
+        let rotation_changed = !rotation.is_added()
+            && is_changed_after_tick(
+                Ref::from(rotation.reborrow()),
+                last_physics_tick.0,
+                this_run,
+            );
+        if !rotation_changed
+            && rotation.angle_between(transform_rotation).abs() > rotation_tolerance
+        {
+            *rotation = transform_rotation;
+        }
+    }
 }
 
 /// The cosine of the angle below which a difference between the `GlobalTransform` rotation
@@ -336,13 +314,13 @@ fn compose_to_physics_world(
     entity_transform: &Transform,
     entity_child_of: Option<&ChildOf>,
     ancestors: &Query<(&Transform, Option<&ChildOf>, Has<PhysicsWorld>), Without<Position>>,
-) -> (Vector, Quaternion) {
+) -> (Vector, Quat) {
     // Start with the entity's own transform.
     #[cfg(feature = "2d")]
-    let mut translation = entity_transform.translation.truncate().adjust_precision();
+    let mut translation = entity_transform.translation.truncate();
     #[cfg(feature = "3d")]
-    let mut translation = entity_transform.translation.adjust_precision();
-    let mut rotation: Quaternion = entity_transform.rotation.adjust_precision();
+    let mut translation = entity_transform.translation;
+    let mut rotation: Quat = entity_transform.rotation;
 
     // Walk up to the PhysicsWorld, composing ancestor transforms.
     let Some(&ChildOf(mut current_parent)) = entity_child_of else {
@@ -360,18 +338,18 @@ fn compose_to_physics_world(
             break;
         }
         // Compose: position_in_parent_space = parent_transform * child_position
-        let parent_rot: Quaternion = parent_transform.rotation.adjust_precision();
+        let parent_rot: Quat = parent_transform.rotation;
         #[cfg(feature = "2d")]
         {
-            let parent_translation = parent_transform.translation.truncate().adjust_precision();
-            let parent_scale = parent_transform.scale.truncate().adjust_precision();
+            let parent_translation = parent_transform.translation.truncate();
+            let parent_scale = parent_transform.scale.truncate();
             translation = (parent_rot * (parent_scale * translation).extend(0.0)).truncate()
                 + parent_translation;
         }
         #[cfg(feature = "3d")]
         {
-            let parent_translation = parent_transform.translation.adjust_precision();
-            let parent_scale = parent_transform.scale.adjust_precision();
+            let parent_translation = parent_transform.translation;
+            let parent_scale = parent_transform.scale;
             translation = parent_rot * (parent_scale * translation) + parent_translation;
         }
         rotation = parent_rot * rotation;
