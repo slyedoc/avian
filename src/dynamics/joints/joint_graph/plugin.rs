@@ -95,10 +95,14 @@ impl<T: Component + EntityConstraint<2>> Plugin for JointGraphPlugin<T> {
 /// which may need to link and unlink joints from simulation islands or other structures.
 #[derive(Message, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JointGraphChange {
-    /// A joint was added to the [`JointGraph`].
-    Added(JointId),
-    /// A joint was removed from the [`JointGraph`].
-    Removed(JointId),
+    /// A joint was added to the [`JointGraph`] of the given [`PhysicsWorld`] entity.
+    ///
+    /// [`PhysicsWorld`]: crate::world::PhysicsWorld
+    Added(Entity, JointId),
+    /// A joint was removed from the [`JointGraph`] of the given [`PhysicsWorld`] entity.
+    ///
+    /// [`PhysicsWorld`]: crate::world::PhysicsWorld
+    Removed(Entity, JointId),
 }
 
 /// A component that holds the [`ComponentId`] of the [joint] component on this entity, if any.
@@ -126,7 +130,8 @@ fn add_joint_to_graph<
 >(
     trigger: On<E>,
     query: Query<(&T, Has<JointCollisionDisabled>), F>,
-    mut joint_graph: Single<&mut JointGraph>,
+    mut worlds: Query<&mut JointGraph, With<crate::world::PhysicsWorld>>,
+    world_lookup: crate::world::PhysicsWorldLookup,
     mut joint_graph_changes: MessageWriter<JointGraphChange>,
     #[cfg(feature = "xpbd_joints")] mut commands: Commands,
 ) {
@@ -138,7 +143,11 @@ fn add_joint_to_graph<
 
     let [body1, body2] = joint.entities();
 
-    // Add the joint to the joint graph.
+    // Add the joint to the graph of the world the first body lives in.
+    let world_entity = world_lookup.world_entity_of(body1);
+    let Ok(mut joint_graph) = worlds.get_mut(world_entity) else {
+        return;
+    };
     let joint_edge = JointGraphEdge::new(entity, body1, body2, collision_disabled);
     let joint_id = joint_graph.add_joint(joint_edge);
 
@@ -149,23 +158,30 @@ fn add_joint_to_graph<
     }
 
     // Record the change.
-    joint_graph_changes.write(JointGraphChange::Added(joint_id));
+    joint_graph_changes.write(JointGraphChange::Added(world_entity, joint_id));
 }
 
 fn remove_joint_from_graph<E: EventPattern<Event: EntityEvent>>(
     trigger: On<E>,
-    mut joint_graph: Single<&mut JointGraph>,
+    mut worlds: Query<&mut JointGraph, With<crate::world::PhysicsWorld>>,
+    world_lookup: crate::world::PhysicsWorldLookup,
     mut joint_graph_changes: MessageWriter<JointGraphChange>,
     #[cfg(feature = "xpbd_joints")] mut commands: Commands,
 ) {
     let entity = trigger.event_target();
 
+    // The joint lives in the graph of its own world (joints between worlds are not
+    // supported).
+    let world_entity = world_lookup.world_entity_of(entity);
+    let Ok(mut joint_graph) = worlds.get_mut(world_entity) else {
+        return;
+    };
     let Some(joint) = joint_graph.get(entity) else {
         return;
     };
 
     // Record the change.
-    joint_graph_changes.write(JointGraphChange::Removed(joint.id));
+    joint_graph_changes.write(JointGraphChange::Removed(world_entity, joint.id));
     #[cfg(feature = "xpbd_joints")]
     let bodies = [joint.body1, joint.body2];
 
@@ -235,11 +251,22 @@ fn on_remove_joint(mut world: DeferredWorld, ctx: HookContext) {
 fn on_disable_joint_collision(
     trigger: On<Add<JointCollisionDisabled>>,
     query: Query<&RigidBodyColliders>,
-    joint_graph: Single<&JointGraph>,
-    mut contact_graph: Single<&mut ContactGraph>,
-    mut contact_status_changes: ResMut<ContactStatusChangeQueue>,
+    mut worlds: Query<
+        (
+            &JointGraph,
+            &mut ContactGraph,
+            &mut crate::collision::narrow_phase::ContactStatusChangeQueue,
+        ),
+        With<crate::world::PhysicsWorld>,
+    >,
+    world_lookup: crate::world::PhysicsWorldLookup,
 ) {
     let entity = trigger.entity;
+    let Ok((joint_graph, mut contact_graph, mut contact_status_changes)) =
+        worlds.get_mut(world_lookup.world_entity_of(entity))
+    else {
+        return;
+    };
 
     // Iterate through each collider of the body with fewer colliders,
     // find contacts with the other body, and remove them.
@@ -288,12 +315,17 @@ fn on_disable_joint_collision(
 /// Update the joint graph when the entities of a joint change.
 fn on_change_joint_entities<T: Component + EntityConstraint<2>>(
     query: Query<(Entity, &T), Changed<T>>,
-    mut joint_graph: Single<&mut JointGraph>,
+    mut worlds: Query<&mut JointGraph, With<crate::world::PhysicsWorld>>,
+    world_lookup: crate::world::PhysicsWorldLookup,
     mut joint_graph_changes: MessageWriter<JointGraphChange>,
     #[cfg(feature = "xpbd_joints")] mut commands: Commands,
 ) {
     for (entity, joint) in &query {
         let [body1, body2] = joint.entities();
+        let world_entity = world_lookup.world_entity_of(entity);
+        let Ok(mut joint_graph) = worlds.get_mut(world_entity) else {
+            continue;
+        };
         let Some(old_edge) = joint_graph.get(entity) else {
             continue;
         };
@@ -306,7 +338,7 @@ fn on_change_joint_entities<T: Component + EntityConstraint<2>>(
             // Remove the old joint edge.
             if let Some(mut edge) = joint_graph.remove_joint(entity) {
                 // Record the removal.
-                joint_graph_changes.write(JointGraphChange::Removed(old_id));
+                joint_graph_changes.write(JointGraphChange::Removed(world_entity, old_id));
 
                 // Update the edge with the new bodies.
                 edge.body1 = body1;
@@ -316,7 +348,7 @@ fn on_change_joint_entities<T: Component + EntityConstraint<2>>(
                 let joint_id = joint_graph.add_joint(edge);
 
                 // Record the addition.
-                joint_graph_changes.write(JointGraphChange::Added(joint_id));
+                joint_graph_changes.write(JointGraphChange::Added(world_entity, joint_id));
 
                 // Move XPBD velocity projection over to the new bodies.
                 #[cfg(feature = "xpbd_joints")]

@@ -72,16 +72,26 @@ pub struct NarrowPhase<'w, 's, C: AnyCollider> {
     collider_query: Query<'w, 's, ColliderQuery<C>, Without<ColliderDisabled>>,
     colliding_entities_query: Query<'w, 's, &'static mut CollidingEntities>,
     body_query: Query<'w, 's, RigidBodyQuery, Without<RigidBodyDisabled>>,
-    pub contact_graph: Single<'w, 's, &'static mut ContactGraph>,
-    /// The queue of contact status changess.
-    pub contact_status_changes: ResMut<'w, ContactStatusChangeQueue>,
-    contact_status_bits: Single<'w, 's, &'static mut ContactStatusBits>,
     #[cfg(feature = "parallel")]
     thread_locals: ResMut<'w, NarrowPhaseThreadLocals>,
-    pub config: Single<'w, 's, &'static NarrowPhaseConfig>,
-    default_friction: Single<'w, 's, &'static DefaultFriction>,
-    default_restitution: Single<'w, 's, &'static DefaultRestitution>,
-    length_unit: Single<'w, 's, &'static PhysicsLengthUnit>,
+}
+
+/// The per-world narrow phase state, fetched from each [`PhysicsWorld`] entity and passed
+/// into [`NarrowPhase::update`] -- the narrow phase runs once per world.
+///
+/// [`PhysicsWorld`]: crate::world::PhysicsWorld
+#[derive(bevy::ecs::query::QueryData)]
+#[query_data(mutable)]
+#[expect(missing_docs)]
+pub struct NarrowPhaseWorldQuery {
+    pub entity: Entity,
+    pub contact_graph: &'static mut ContactGraph,
+    pub contact_status_changes: &'static mut ContactStatusChangeQueue,
+    pub contact_status_bits: &'static mut ContactStatusBits,
+    pub config: &'static NarrowPhaseConfig,
+    pub default_friction: &'static DefaultFriction,
+    pub default_restitution: &'static DefaultRestitution,
+    pub length_unit: &'static PhysicsLengthUnit,
 }
 
 /// A bit vector for tracking contact status changes.
@@ -147,7 +157,7 @@ pub enum ContactStatusChange {
 
 /// A queue of [`ContactStatusChange`]s recorded by the narrow phase
 /// and applied by the solver.
-#[derive(Resource, Default, Debug, Deref, DerefMut)]
+#[derive(Component, Default, Debug, Deref, DerefMut)]
 pub struct ContactStatusChangeQueue(pub Vec<ContactStatusChange>);
 
 impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
@@ -159,6 +169,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
     /// - Records [`ContactStatusChange`]s into [`ContactStatusChangeQueue`] for the solver to apply.
     pub fn update<H: CollisionHooks>(
         &mut self,
+        w: &mut NarrowPhaseWorldQueryItem<'_, '_>,
         collision_started_writer: &mut MessageWriter<CollisionStart>,
         collision_ended_writer: &mut MessageWriter<CollisionEnd>,
         delta_secs: f32,
@@ -170,7 +181,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
         for<'w, 's> SystemParamItem<'w, 's, H>: CollisionHooks,
     {
         // Update contacts for all contact pairs.
-        self.update_contacts::<H>(delta_secs, hooks, context, diagnostics, commands);
+        self.update_contacts::<H>(w, delta_secs, hooks, context, diagnostics, commands);
 
         // Process contact status changes, iterating over set bits serially to maintain determinism.
         //
@@ -179,13 +190,13 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
         //
         // Iterating over set bits is done efficiently with the "count trailing zeros" method:
         // https://lemire.me/blog/2018/02/21/iterating-over-set-bits-quickly/
-        for (i, mut bits) in self.contact_status_bits.blocks().enumerate() {
+        for (i, mut bits) in w.contact_status_bits.blocks().enumerate() {
             while bits != 0 {
                 let trailing_zeros = bits.trailing_zeros();
                 let contact_id = ContactId(i as u32 * 64 + trailing_zeros);
 
-                let (contact_edge, contact_pair) = self
-                    .contact_graph
+                let (contact_edge, contact_pair) = w
+                        .contact_graph
                     .get_mut_by_id(contact_id)
                     .unwrap_or_else(|| panic!("Contact pair not found for {contact_id:?}"));
 
@@ -222,7 +233,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                     if contact_pair.generates_constraints()
                         && let (Some(body1), Some(body2)) = (contact_pair.body1, contact_pair.body2)
                     {
-                        self.contact_status_changes.push(
+                        w.contact_status_changes.push(
                             ContactStatusChange::StoppedGeneratingConstraints {
                                 contact_id,
                                 body1,
@@ -232,7 +243,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                     }
 
                     // Remove the contact edge from the contact graph.
-                    self.contact_graph.remove_edge_by_id(&pair_key, contact_id);
+                    w.contact_graph.remove_edge_by_id(&pair_key, contact_id);
                 } else if contact_pair.collision_started() {
                     // Send collision started event.
                     if contact_edge.events_enabled() {
@@ -262,7 +273,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                         .set(ContactPairFlags::STARTED_TOUCHING, false);
 
                     if contact_pair.generates_constraints() {
-                        self.contact_status_changes.push(
+                        w.contact_status_changes.push(
                             ContactStatusChange::StartedGeneratingConstraints(contact_id),
                         );
                     }
@@ -300,7 +311,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                     if contact_pair.generates_constraints()
                         && let (Some(body1), Some(body2)) = (contact_pair.body1, contact_pair.body2)
                     {
-                        self.contact_status_changes.push(
+                        w.contact_status_changes.push(
                             ContactStatusChange::StoppedGeneratingConstraints {
                                 contact_id,
                                 body1,
@@ -318,7 +329,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                         .flags
                         .set(ContactPairFlags::STARTED_GENERATING_CONSTRAINTS, false);
 
-                    self.contact_status_changes.push(
+                    w.contact_status_changes.push(
                         ContactStatusChange::StartedGeneratingConstraints(contact_id),
                     );
                 } else if contact_pair.is_touching()
@@ -331,7 +342,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                     contact_pair.manifold_count_change = 0;
 
                     if let (Some(body1), Some(body2)) = (contact_pair.body1, contact_pair.body2) {
-                        self.contact_status_changes.push(
+                        w.contact_status_changes.push(
                             ContactStatusChange::ManifoldCountChanged {
                                 contact: contact_id,
                                 body1,
@@ -385,6 +396,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
     /// The order of contact pairs is preserved.
     fn update_contacts<H: CollisionHooks>(
         &mut self,
+        w: &mut NarrowPhaseWorldQueryItem<'_, '_>,
         delta_secs: f32,
         hooks: &SystemParamItem<H>,
         collider_context: &SystemParamItem<C::Context>,
@@ -393,23 +405,23 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
     ) where
         for<'w, 's> SystemParamItem<'w, 's, H>: CollisionHooks,
     {
-        let length_unit = self.length_unit.0;
-        let contact_tolerance = length_unit * self.config.contact_tolerance;
-        let recycle_distance = length_unit * self.config.recycle_distance;
+        let length_unit = w.length_unit.0;
+        let contact_tolerance = length_unit * w.config.contact_tolerance;
+        let recycle_distance = length_unit * w.config.recycle_distance;
         let recycle_distance_non_touching = recycle_distance.min(contact_tolerance);
         #[cfg(feature = "2d")]
-        let recycle_angle_cos = ops::cos(self.config.recycle_angle);
+        let recycle_angle_cos = ops::cos(w.config.recycle_angle);
         #[cfg(feature = "3d")]
-        let recycle_angular_distance = ops::cos(self.config.recycle_angle * 0.5).squared();
+        let recycle_angular_distance = ops::cos(w.config.recycle_angle * 0.5).squared();
         let inv_delta_secs = delta_secs.recip();
 
         // Contact bit vecs must be sized based on the full contact capacity,
         // not the number of active contact pairs, because pair indices
         // are unstable and can be invalidated when pairs are removed.
-        let bit_count = self.contact_graph.edges.raw_edges().len();
+        let bit_count = w.contact_graph.edges.raw_edges().len();
 
         // Clear the bit vector used to track status changes for each contact pair.
-        self.contact_status_bits.set_bit_count_and_clear(bit_count);
+        w.contact_status_bits.set_bit_count_and_clear(bit_count);
 
         #[cfg(feature = "parallel")]
         self.thread_locals.iter_mut().for_each(|context| {
@@ -435,11 +447,11 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
         //
         // TODO: An alternative to thread-local bit vectors could be to have one larger bit vector
         //       and to chunk it into smaller bit vectors for each thread. Might not be any faster though.
-        crate::utils::par_for_each(self.contact_graph.active_pairs_mut(), 64, |_i, contacts| {
+        crate::utils::par_for_each(w.contact_graph.active_pairs_mut(), 64, |_i, contacts| {
             let contact_id = contacts.contact_id.0 as usize;
 
             #[cfg(not(feature = "parallel"))]
-            let contact_status_bits = &mut self.contact_status_bits;
+            let contact_status_bits = &mut w.contact_status_bits;
             #[cfg(not(feature = "parallel"))]
             let recycled_count = &mut diagnostics.recycled_count;
 
@@ -722,24 +734,24 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                     .friction
                     .or(rb_friction1)
                     .copied()
-                    .unwrap_or(self.default_friction.0)
+                    .unwrap_or(w.default_friction.0)
                     .combine(
                         collider2
                             .friction
                             .or(rb_friction2)
                             .copied()
-                            .unwrap_or(self.default_friction.0),
+                            .unwrap_or(w.default_friction.0),
                     )
                     .dynamic_coefficient;
                 let restitution = collider1
                     .restitution
                     .copied()
-                    .unwrap_or(self.default_restitution.0)
+                    .unwrap_or(w.default_restitution.0)
                     .combine(
                         collider2
                             .restitution
                             .copied()
-                            .unwrap_or(self.default_restitution.0),
+                            .unwrap_or(w.default_restitution.0),
                     )
                     .coefficient;
 
@@ -884,9 +896,9 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
 
                 // TODO: This condition is pretty arbitrary, mainly to skip dense trimeshes.
                 //       If we let Parry handle contact matching, this wouldn't be needed.
-                if contacts.manifolds.len() <= 4 && self.config.match_contacts {
+                if contacts.manifolds.len() <= 4 && w.config.match_contacts {
                     // TODO: Cache this?
-                    let distance_threshold = 0.1 * self.length_unit.0;
+                    let distance_threshold = 0.1 * w.length_unit.0;
 
                     for manifold in contacts.manifolds.iter_mut() {
                         for previous_manifold in old_manifolds.iter() {
@@ -924,7 +936,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
             self.thread_locals.iter_mut().for_each(|context| {
                 let thread_context = context.borrow();
                 let contact_status_bits = &thread_context.contact_status_bits;
-                self.contact_status_bits.or(contact_status_bits);
+                w.contact_status_bits.or(contact_status_bits);
                 diagnostics.recycled_count += thread_context.recycled_count;
             });
         }
