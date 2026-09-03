@@ -76,9 +76,17 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
                 &mut EnlargedAabb,
                 &mut ColliderAabbMargin,
             )>,
-             narrow_phase_config: Single<&NarrowPhaseConfig>,
-             length_unit: Single<&PhysicsLengthUnit>,
+             worlds: bevy::prelude::Query<
+                 (&NarrowPhaseConfig, &PhysicsLengthUnit),
+                 bevy::prelude::With<crate::world::PhysicsWorld>,
+             >,
+             world_lookup: crate::world::PhysicsWorldLookup,
              collider_context: StaticSystemParam<C::Context>| {
+                let Ok((narrow_phase_config, length_unit)) =
+                    worlds.get(world_lookup.world_entity_of(trigger.entity))
+                else {
+                    return;
+                };
                 let contact_tolerance = length_unit.0 * narrow_phase_config.contact_tolerance;
 
                 if let Ok((
@@ -150,9 +158,17 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
                 ),
                 (With<C>, Without<ColliderDisabled>),
             >,
-             mut trees: Single<&mut ColliderTrees>,
-             mut moved_proxies: Single<&mut MovedProxies>| {
+             mut worlds: bevy::prelude::Query<
+                 (&mut ColliderTrees, &mut MovedProxies),
+                 bevy::prelude::With<crate::world::PhysicsWorld>,
+             >,
+             world_lookup: crate::world::PhysicsWorldLookup| {
                 let entity = trigger.entity;
+                let Ok((mut trees, mut moved_proxies)) =
+                    worlds.get_mut(world_lookup.world_entity_of(entity))
+                else {
+                    return;
+                };
 
                 let Ok((
                     mut proxy_key,
@@ -227,9 +243,17 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
                 ),
                 Without<ColliderDisabled>,
             >,
-             mut trees: Single<&mut ColliderTrees>,
-             mut moved_proxies: Single<&mut MovedProxies>| {
+             mut worlds: bevy::prelude::Query<
+                 (&mut ColliderTrees, &mut MovedProxies),
+                 bevy::prelude::With<crate::world::PhysicsWorld>,
+             >,
+             world_lookup: crate::world::PhysicsWorldLookup| {
                 let entity = trigger.entity;
+                let Ok((mut trees, mut moved_proxies)) =
+                    worlds.get_mut(world_lookup.world_entity_of(entity))
+                else {
+                    return;
+                };
 
                 let Ok((new_rb, body_colliders, is_body_disabled)) = body_query.get(entity) else {
                     return;
@@ -292,8 +316,15 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
         app.add_observer(
             |trigger: On<Add<Sensor>>,
              mut collider_query: Query<&ColliderTreeProxyKey, Without<ColliderDisabled>>,
-             mut trees: Single<&mut ColliderTrees>| {
+             mut worlds: bevy::prelude::Query<
+                 &mut ColliderTrees,
+                 bevy::prelude::With<crate::world::PhysicsWorld>,
+             >,
+             world_lookup: crate::world::PhysicsWorldLookup| {
                 let entity = trigger.entity;
+                let Ok(mut trees) = worlds.get_mut(world_lookup.world_entity_of(entity)) else {
+                    return;
+                };
 
                 let Ok(proxy_key) = collider_query.get_mut(entity) else {
                     return;
@@ -312,8 +343,15 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
         app.add_observer(
             |trigger: On<Remove<Sensor>>,
              mut collider_query: Query<&ColliderTreeProxyKey, Without<ColliderDisabled>>,
-             mut trees: Single<&mut ColliderTrees>| {
+             mut worlds: bevy::prelude::Query<
+                 &mut ColliderTrees,
+                 bevy::prelude::With<crate::world::PhysicsWorld>,
+             >,
+             world_lookup: crate::world::PhysicsWorldLookup| {
                 let entity = trigger.entity;
+                let Ok(mut trees) = worlds.get_mut(world_lookup.world_entity_of(entity)) else {
+                    return;
+                };
 
                 let Ok(proxy_key) = collider_query.get_mut(entity) else {
                     return;
@@ -335,8 +373,15 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
                 (&ColliderTreeProxyKey, Option<&CollisionLayers>),
                 Without<ColliderDisabled>,
             >,
-             mut trees: Single<&mut ColliderTrees>| {
+             mut worlds: bevy::prelude::Query<
+                 &mut ColliderTrees,
+                 bevy::prelude::With<crate::world::PhysicsWorld>,
+             >,
+             world_lookup: crate::world::PhysicsWorldLookup| {
                 let entity = trigger.entity;
+                let Ok(mut trees) = worlds.get_mut(world_lookup.world_entity_of(entity)) else {
+                    return;
+                };
 
                 let Ok((proxy_key, layers)) = collider_query.get_mut(entity) else {
                     return;
@@ -358,8 +403,15 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
                 (&ColliderTreeProxyKey, Option<&ActiveCollisionHooks>),
                 Without<ColliderDisabled>,
             >,
-             mut trees: Single<&mut ColliderTrees>| {
+             mut worlds: bevy::prelude::Query<
+                 &mut ColliderTrees,
+                 bevy::prelude::With<crate::world::PhysicsWorld>,
+             >,
+             world_lookup: crate::world::PhysicsWorldLookup| {
                 let entity = trigger.entity;
+                let Ok(mut trees) = worlds.get_mut(world_lookup.world_entity_of(entity)) else {
+                    return;
+                };
 
                 let Ok((proxy_key, active_hooks)) = collider_query.get_mut(entity) else {
                     return;
@@ -383,8 +435,15 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
             |trigger: On<Discard<RigidBodyDisabled>>,
              body_query: Query<(&RigidBodyColliders, Has<RigidBodyDisabled>)>,
              mut collider_query: Query<&ColliderTreeProxyKey, Without<ColliderDisabled>>,
-             mut trees: Single<&mut ColliderTrees>| {
+             mut worlds: bevy::prelude::Query<
+                 &mut ColliderTrees,
+                 bevy::prelude::With<crate::world::PhysicsWorld>,
+             >,
+             world_lookup: crate::world::PhysicsWorldLookup| {
                 let entity = trigger.entity;
+                let Ok(mut trees) = worlds.get_mut(world_lookup.world_entity_of(entity)) else {
+                    return;
+                };
 
                 let Ok((body_colliders, is_body_disabled)) = body_query.get(entity) else {
                     return;
@@ -426,10 +485,18 @@ fn add_to_tree_on<E: EventPattern<Event: EntityEvent>, F: QueryFilter>(
         ),
         F,
     >,
-    mut trees: Single<&mut ColliderTrees>,
-    mut moved_proxies: Single<&mut MovedProxies>,
+    mut worlds: Query<
+        (&mut ColliderTrees, &mut MovedProxies),
+        With<crate::world::PhysicsWorld>,
+    >,
+    world_lookup: crate::world::PhysicsWorldLookup,
 ) {
     let entity = trigger.event_target();
+    let Ok((mut trees, mut moved_proxies)) =
+        worlds.get_mut(world_lookup.world_entity_of(entity))
+    else {
+        return;
+    };
 
     let Ok((
         collider_of,
@@ -506,10 +573,18 @@ fn add_to_tree_on<E: EventPattern<Event: EntityEvent>, F: QueryFilter>(
 fn remove_from_tree_on<E: EventPattern<Event: EntityEvent>, F: QueryFilter>(
     trigger: On<E>,
     mut collider_query: Query<&mut ColliderTreeProxyKey, F>,
-    mut trees: Single<&mut ColliderTrees>,
-    mut moved_proxies: Single<&mut MovedProxies>,
+    mut worlds: Query<
+        (&mut ColliderTrees, &mut MovedProxies),
+        With<crate::world::PhysicsWorld>,
+    >,
+    world_lookup: crate::world::PhysicsWorldLookup,
 ) {
     let entity = trigger.event_target();
+    let Ok((mut trees, mut moved_proxies)) =
+        worlds.get_mut(world_lookup.world_entity_of(entity))
+    else {
+        return;
+    };
 
     let Ok(mut proxy_key) = collider_query.get_mut(entity) else {
         return;
@@ -689,6 +764,7 @@ impl EnlargedProxiesBitVec {
 fn update_solver_body_aabbs<C: AnyCollider>(
     body_query: Query<
         (
+            Entity,
             &Position,
             &ComputedCenterOfMass,
             &LinearVelocity,
@@ -714,20 +790,40 @@ fn update_solver_body_aabbs<C: AnyCollider>(
         >,
         Query<&EnlargedAabb, Without<ColliderDisabled>>,
     )>,
-    narrow_phase_config: Single<&NarrowPhaseConfig>,
-    length_unit: Single<&PhysicsLengthUnit>,
     time: Res<Time>,
-    mut trees: Single<&mut ColliderTrees>,
-    mut moved_proxies: Single<&mut MovedProxies>,
-    mut enlarged_proxies: Single<&mut EnlargedProxies>,
+    mut worlds: Query<
+        (
+            Entity,
+            &NarrowPhaseConfig,
+            &PhysicsLengthUnit,
+            &mut ColliderTrees,
+            &mut MovedProxies,
+            &mut EnlargedProxies,
+            &mut ColliderTreeDiagnostics,
+            &mut LastDynamicKinematicAabbUpdate,
+        ),
+        With<crate::world::PhysicsWorld>,
+    >,
+    world_lookup: crate::world::PhysicsWorldLookup,
     collider_context: StaticSystemParam<C::Context>,
-    mut diagnostics: Single<&mut ColliderTreeDiagnostics>,
-    mut last_tick: Single<&mut LastDynamicKinematicAabbUpdate>,
     system_tick: SystemChangeTick,
 ) {
     let start = crate::utils::Instant::now();
 
     let this_run = system_tick.this_run();
+
+    // Per world: each world's trees/proxies see only its own bodies.
+    for (
+        world_entity,
+        narrow_phase_config,
+        length_unit,
+        mut trees,
+        mut moved_proxies,
+        mut enlarged_proxies,
+        mut diagnostics,
+        mut last_tick,
+    ) in worlds.iter_mut()
+    {
 
     // An upper bound on the number of proxies, for sizing the bit vectors.
     // TODO: Use a better way to track the number of proxies.
@@ -749,7 +845,10 @@ fn update_solver_body_aabbs<C: AnyCollider>(
 
     body_query.par_for_each(
         MIN_PAR_ITER_ENTITIES,
-        |(rb_pos, center_of_mass, lin_vel, ang_vel, body_colliders, speculative_ccd)| {
+        |(body_entity, rb_pos, center_of_mass, lin_vel, ang_vel, body_colliders, speculative_ccd)| {
+            if world_lookup.world_entity_of(body_entity) != world_entity {
+                return;
+            }
             for collider_entity in body_colliders.iter() {
                 let Ok((
                     collider,
@@ -855,6 +954,7 @@ fn update_solver_body_aabbs<C: AnyCollider>(
     last_tick.0 = this_run;
 
     diagnostics.update += start.elapsed();
+    }
 }
 
 /// Updates the AABBs of colliders that have been manually moved after the previous physics step.
@@ -876,19 +976,38 @@ pub fn update_moved_collider_aabbs<C: AnyCollider>(
         >,
         Query<&EnlargedAabb, Without<ColliderDisabled>>,
     )>,
-    narrow_phase_config: Single<&NarrowPhaseConfig>,
-    length_unit: Single<&PhysicsLengthUnit>,
-    mut trees: Single<&mut ColliderTrees>,
-    mut moved_proxies: Single<&mut MovedProxies>,
-    mut enlarged_proxies: Single<&mut EnlargedProxies>,
+    mut worlds: Query<
+        (
+            Entity,
+            &NarrowPhaseConfig,
+            &PhysicsLengthUnit,
+            &mut ColliderTrees,
+            &mut MovedProxies,
+            &mut EnlargedProxies,
+            &mut ColliderTreeDiagnostics,
+        ),
+        With<crate::world::PhysicsWorld>,
+    >,
+    world_lookup: crate::world::PhysicsWorldLookup,
     collider_context: StaticSystemParam<C::Context>,
-    mut diagnostics: Single<&mut ColliderTreeDiagnostics>,
     last_tick: Res<LastPhysicsTick>,
     system_tick: SystemChangeTick,
 ) {
     let start = crate::utils::Instant::now();
 
     let this_run = system_tick.this_run();
+
+    // Per world: each world's trees/proxies see only its own colliders.
+    for (
+        world_entity,
+        narrow_phase_config,
+        length_unit,
+        mut trees,
+        mut moved_proxies,
+        mut enlarged_proxies,
+        mut diagnostics,
+    ) in worlds.iter_mut()
+    {
 
     // An upper bound on the number of proxies, for sizing the bit vectors.
     let cap_dynamic = trees.dynamic_tree.proxies.capacity();
@@ -924,6 +1043,9 @@ pub fn update_moved_collider_aabbs<C: AnyCollider>(
             collision_margin,
             proxy_key,
         )| {
+            if world_lookup.world_entity_of(entity) != world_entity {
+                return;
+            }
             // Skip if the collider's AABB can't have changed since the last physics tick.
             let collider_changed = collider.last_changed().is_newer_than(last_tick.0, this_run);
             if !pos.last_changed().is_newer_than(last_tick.0, this_run)
@@ -995,6 +1117,7 @@ pub fn update_moved_collider_aabbs<C: AnyCollider>(
     }
 
     diagnostics.update += start.elapsed();
+    }
 }
 
 /// Applies the [`EnlargedAabb`]s of the proxies flagged in `bit_vec` to the tree,
@@ -1090,9 +1213,13 @@ fn update_tree(
     }
 }
 
-fn clear_moved_proxies(mut moved_proxies: Single<&mut MovedProxies>, mut trees: Single<&mut ColliderTrees>) {
-    moved_proxies.clear();
-    trees.iter_trees_mut().for_each(|t| t.moved_proxies.clear());
+fn clear_moved_proxies(
+    mut worlds: Query<(&mut MovedProxies, &mut ColliderTrees), With<crate::world::PhysicsWorld>>,
+) {
+    for (mut moved_proxies, mut trees) in worlds.iter_mut() {
+        moved_proxies.clear();
+        trees.iter_trees_mut().for_each(|t| t.moved_proxies.clear());
+    }
 }
 
 #[cfg(test)]

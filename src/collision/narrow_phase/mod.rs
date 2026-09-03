@@ -21,7 +21,9 @@ pub(crate) mod system_param;
 use system_param::ContactStatusBits;
 #[cfg(feature = "parallel")]
 use system_param::NarrowPhaseThreadLocals;
-pub use system_param::{ContactStatusChange, ContactStatusChangeQueue, NarrowPhase};
+pub use system_param::{
+    ContactStatusChange, ContactStatusChangeQueue, NarrowPhase, NarrowPhaseWorldQuery,
+};
 
 use core::marker::PhantomData;
 
@@ -85,9 +87,7 @@ where
     fn build(&self, app: &mut App) {
         let already_initialized = app.world().is_resource_added::<NarrowPhaseInitialized>();
 
-        // Per-world graph/config state lives on the PhysicsWorld entity; only the
-        // status-change queue (drained every step) stays global for now.
-        app.init_resource::<ContactStatusChangeQueue>();
+        // Per-world graph/config/queue state lives on the PhysicsWorld entity.
 
         #[cfg(feature = "parallel")]
         app.init_resource::<NarrowPhaseThreadLocals>();
@@ -244,30 +244,38 @@ pub type NarrowPhaseSet = NarrowPhaseSystems;
 
 fn update_narrow_phase<C: AnyCollider, H: CollisionHooks + 'static>(
     mut narrow_phase: NarrowPhase<C>,
+    mut worlds: Query<NarrowPhaseWorldQuery, With<crate::world::PhysicsWorld>>,
+    mut world_diagnostics: Query<&mut CollisionDiagnostics, With<crate::world::PhysicsWorld>>,
     mut collision_started_writer: MessageWriter<CollisionStart>,
     mut collision_ended_writer: MessageWriter<CollisionEnd>,
     time: Res<Time>,
     hooks: StaticSystemParam<H>,
     context: StaticSystemParam<C::Context>,
     mut commands: ParallelCommands,
-    mut diagnostics: Single<&mut CollisionDiagnostics>,
 ) where
     for<'w, 's> SystemParamItem<'w, 's, H>: CollisionHooks,
 {
-    let start = crate::utils::Instant::now();
+    // The narrow phase runs once per physics world, against that world's graphs/config.
+    for mut w in worlds.iter_mut() {
+        let Ok(mut diagnostics) = world_diagnostics.get_mut(w.entity) else {
+            continue;
+        };
+        let start = crate::utils::Instant::now();
 
-    narrow_phase.update::<H>(
-        &mut collision_started_writer,
-        &mut collision_ended_writer,
-        time.delta_secs(),
-        &hooks,
-        &context,
-        &mut diagnostics,
-        &mut commands,
-    );
+        narrow_phase.update::<H>(
+            &mut w,
+            &mut collision_started_writer,
+            &mut collision_ended_writer,
+            time.delta_secs(),
+            &hooks,
+            &context,
+            &mut diagnostics,
+            &mut commands,
+        );
 
-    diagnostics.narrow_phase = start.elapsed();
-    diagnostics.contact_count = narrow_phase.contact_graph.edges.edge_count() as u32;
+        diagnostics.narrow_phase = start.elapsed();
+        diagnostics.contact_count = w.contact_graph.edges.edge_count() as u32;
+    }
 }
 
 #[derive(SystemParam)]
@@ -429,10 +437,18 @@ fn remove_body_on<E: EventPattern<Event: EntityEvent>>(
     body_collider_query: Query<&RigidBodyColliders>,
     mut colliding_entities_query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
-    mut contact_status_changes: ResMut<ContactStatusChangeQueue>,
-    mut contact_graph: Single<&mut ContactGraph>,
+    mut worlds: Query<
+        (&mut ContactGraph, &mut ContactStatusChangeQueue),
+        With<crate::world::PhysicsWorld>,
+    >,
+    world_lookup: crate::world::PhysicsWorldLookup,
 ) {
     let Ok(colliders) = body_collider_query.get(trigger.event_target()) else {
+        return;
+    };
+    let Ok((mut contact_graph, mut contact_status_changes)) =
+        worlds.get_mut(world_lookup.world_entity_of(trigger.event_target()))
+    else {
         return;
     };
 
@@ -454,12 +470,20 @@ fn remove_body_on<E: EventPattern<Event: EntityEvent>>(
 /// wakes up the other body, and writes a [`CollisionEnd`] event.
 fn remove_collider_on<E: EventPattern<Event: EntityEvent>>(
     trigger: On<E>,
-    mut contact_graph: Single<&mut ContactGraph>,
-    mut contact_status_changes: ResMut<ContactStatusChangeQueue>,
+    mut worlds: Query<
+        (&mut ContactGraph, &mut ContactStatusChangeQueue),
+        With<crate::world::PhysicsWorld>,
+    >,
+    world_lookup: crate::world::PhysicsWorldLookup,
     mut query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {
     let entity = trigger.event_target();
+    let Ok((mut contact_graph, mut contact_status_changes)) =
+        worlds.get_mut(world_lookup.world_entity_of(entity))
+    else {
+        return;
+    };
 
     // Remove the collider from the contact graph.
     remove_collider(
@@ -476,12 +500,20 @@ fn remove_collider_on<E: EventPattern<Event: EntityEvent>>(
 fn on_body_remove_rigid_body_disabled(
     trigger: On<Remove<RigidBodyDisabled>>,
     body_collider_query: Query<&RigidBodyColliders>,
-    mut contact_status_changes: ResMut<ContactStatusChangeQueue>,
-    mut contact_graph: Single<&mut ContactGraph>,
+    mut worlds: Query<
+        (&mut ContactGraph, &mut ContactStatusChangeQueue),
+        With<crate::world::PhysicsWorld>,
+    >,
+    world_lookup: crate::world::PhysicsWorldLookup,
     mut colliding_entities_query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {
     let Ok(colliders) = body_collider_query.get(trigger.entity) else {
+        return;
+    };
+    let Ok((mut contact_graph, mut contact_status_changes)) =
+        worlds.get_mut(world_lookup.world_entity_of(trigger.entity))
+    else {
         return;
     };
 
@@ -501,12 +533,20 @@ fn on_body_remove_rigid_body_disabled(
 fn on_disable_body(
     trigger: On<Add<(Disabled, RigidBodyDisabled)>>,
     body_collider_query: Query<&RigidBodyColliders, Allow<Disabled>>,
-    mut contact_status_changes: ResMut<ContactStatusChangeQueue>,
-    mut contact_graph: Single<&mut ContactGraph>,
+    mut worlds: Query<
+        (&mut ContactGraph, &mut ContactStatusChangeQueue),
+        With<crate::world::PhysicsWorld>,
+    >,
+    world_lookup: crate::world::PhysicsWorldLookup,
     mut colliding_entities_query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {
     let Ok(colliders) = body_collider_query.get(trigger.entity) else {
+        return;
+    };
+    let Ok((mut contact_graph, mut contact_status_changes)) =
+        worlds.get_mut(world_lookup.world_entity_of(trigger.entity))
+    else {
         return;
     };
 
@@ -528,11 +568,19 @@ fn on_disable_body(
 /// when a collider becomes a [`Sensor`].
 fn on_add_sensor(
     trigger: On<Add<Sensor>>,
-    mut contact_status_changes: ResMut<ContactStatusChangeQueue>,
-    mut contact_graph: Single<&mut ContactGraph>,
+    mut worlds: Query<
+        (&mut ContactGraph, &mut ContactStatusChangeQueue),
+        With<crate::world::PhysicsWorld>,
+    >,
+    world_lookup: crate::world::PhysicsWorldLookup,
     mut colliding_entities_query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {
+    let Ok((mut contact_graph, mut contact_status_changes)) =
+        worlds.get_mut(world_lookup.world_entity_of(trigger.entity))
+    else {
+        return;
+    };
     remove_collider(
         trigger.entity,
         &mut contact_graph,
@@ -546,11 +594,19 @@ fn on_add_sensor(
 /// when a collider stops being a [`Sensor`], so that they are re-created fresh.
 fn on_remove_sensor(
     trigger: On<Remove<Sensor>>,
-    mut contact_status_changes: ResMut<ContactStatusChangeQueue>,
-    mut contact_graph: Single<&mut ContactGraph>,
+    mut worlds: Query<
+        (&mut ContactGraph, &mut ContactStatusChangeQueue),
+        With<crate::world::PhysicsWorld>,
+    >,
+    world_lookup: crate::world::PhysicsWorldLookup,
     mut colliding_entities_query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {
+    let Ok((mut contact_graph, mut contact_status_changes)) =
+        worlds.get_mut(world_lookup.world_entity_of(trigger.entity))
+    else {
+        return;
+    };
     remove_collider(
         trigger.entity,
         &mut contact_graph,

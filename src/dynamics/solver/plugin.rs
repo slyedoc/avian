@@ -188,76 +188,82 @@ impl Plugin for SolverPlugin {
 
 /// Applies the [`ContactStatusChange`]s to the [`ConstraintGraph`] and [`PhysicsIslands`].
 pub fn apply_contact_status_changes(
-    mut changes: ResMut<ContactStatusChangeQueue>,
-    contact_graph: Single<&ContactGraph>,
-    mut constraint_graph: Single<&mut ConstraintGraph>,
-    mut islands_query: Query<&mut PhysicsIslands>,
+    mut worlds: Query<
+        (
+            Entity,
+            &mut ContactStatusChangeQueue,
+            &ContactGraph,
+            &mut ConstraintGraph,
+            &mut PhysicsIslands,
+        ),
+        With<crate::world::PhysicsWorld>,
+    >,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     mut commands: Commands,
-    main_world: Res<crate::world::MainPhysicsWorldEntity>,
 ) {
-    if changes.is_empty() {
-        return;
-    }
+    for (world_entity, mut changes, contact_graph, mut constraint_graph, mut islands) in
+        worlds.iter_mut()
+    {
+        if changes.is_empty() {
+            continue;
+        }
 
-    let mut islands = islands_query.single_mut().ok();
-    let mut islands_to_wake: Vec<IslandId> = Vec::new();
+        let mut islands_to_wake: Vec<IslandId> = Vec::new();
 
-    for change in changes.drain(..) {
-        apply_contact_status_change(
-            change,
-            &contact_graph,
-            &mut constraint_graph,
-            islands.as_deref_mut(),
-            &mut body_islands,
-            &mut islands_to_wake,
-        );
-    }
+        for change in changes.drain(..) {
+            apply_contact_status_change(
+                change,
+                contact_graph,
+                &mut constraint_graph,
+                Some(&mut islands),
+                &mut body_islands,
+                &mut islands_to_wake,
+            );
+        }
 
-    if !islands_to_wake.is_empty() {
-        islands_to_wake.sort_unstable();
-        islands_to_wake.dedup();
+        if !islands_to_wake.is_empty() {
+            islands_to_wake.sort_unstable();
+            islands_to_wake.dedup();
 
-        // Wake up the islands that were previously sleeping.
-        commands.queue(WakeIslands { world_entity: main_world.0, islands: islands_to_wake });
+            // Wake up the islands that were previously sleeping.
+            commands.queue(WakeIslands { world_entity, islands: islands_to_wake });
+        }
     }
 }
 
 /// Applies [`JointGraphChange`] messages to [`PhysicsIslands`].
 pub fn apply_joint_graph_changes(
     mut changes: MessageReader<JointGraphChange>,
-    joint_graph: Single<&JointGraph>,
-    mut islands_query: Query<&mut PhysicsIslands>,
+    mut worlds: Query<(&JointGraph, &mut PhysicsIslands), With<crate::world::PhysicsWorld>>,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     mut commands: Commands,
-    main_world: Res<crate::world::MainPhysicsWorldEntity>,
 ) {
-    let mut islands = islands_query.single_mut().ok();
-    let Some(islands) = &mut islands else {
-        // Islands are not in use, so there is nothing to update.
-        changes.clear();
-        return;
-    };
-
-    let mut islands_to_wake: Vec<IslandId> = Vec::new();
+    // (world entity, island) pairs to wake, batched per world below.
+    let mut islands_to_wake: Vec<(Entity, IslandId)> = Vec::new();
 
     for &change in changes.read() {
         match change {
-            JointGraphChange::Added(joint_id) => {
+            JointGraphChange::Added(world_entity, joint_id) => {
+                let Ok((joint_graph, mut islands)) = worlds.get_mut(world_entity) else {
+                    continue;
+                };
                 // The joint may have already been removed before this change was applied.
                 if joint_graph.get_by_id(joint_id).is_none() {
                     continue;
                 }
 
                 // Link the joint to an island.
-                if let Some(island) = islands.add_joint(joint_id, &mut body_islands, &joint_graph)
+                if let Some(island) = islands.add_joint(joint_id, &mut body_islands, joint_graph)
                     && island.is_sleeping
                 {
                     // Wake up the island if it was previously sleeping.
-                    islands_to_wake.push(island.id);
+                    islands_to_wake.push((world_entity, island.id));
                 }
             }
-            JointGraphChange::Removed(joint_id) => {
+            JointGraphChange::Removed(world_entity, joint_id) => {
+                let Ok((_, mut islands)) = worlds.get_mut(world_entity) else {
+                    continue;
+                };
                 // The joint may never have been linked to an island.
                 if islands.joint_node(joint_id).is_none() {
                     continue;
@@ -268,7 +274,7 @@ pub fn apply_joint_graph_changes(
                     && island.is_sleeping
                 {
                     // Wake up the island if it was previously sleeping.
-                    islands_to_wake.push(island.id);
+                    islands_to_wake.push((world_entity, island.id));
                 }
             }
         }
@@ -278,8 +284,25 @@ pub fn apply_joint_graph_changes(
         islands_to_wake.sort_unstable();
         islands_to_wake.dedup();
 
-        // Wake up the islands that were previously sleeping.
-        commands.queue(WakeIslands { world_entity: main_world.0, islands: islands_to_wake });
+        // Wake the islands that were previously sleeping, batched per world.
+        let mut batch: Vec<IslandId> = Vec::new();
+        let mut batch_world: Option<Entity> = None;
+        for (world_entity, island) in islands_to_wake {
+            if batch_world != Some(world_entity) {
+                if let Some(world_entity) = batch_world.take()
+                    && !batch.is_empty()
+                {
+                    commands.queue(WakeIslands { world_entity, islands: core::mem::take(&mut batch) });
+                }
+                batch_world = Some(world_entity);
+            }
+            batch.push(island);
+        }
+        if let Some(world_entity) = batch_world
+            && !batch.is_empty()
+        {
+            commands.queue(WakeIslands { world_entity, islands: batch });
+        }
     }
 }
 
@@ -370,10 +393,18 @@ fn apply_contact_status_change(
 #[derive(Resource)]
 struct CachedContactStatusChangeSystemState(
     SystemState<(
-        ResMut<'static, ContactStatusChangeQueue>,
-        Query<'static, 'static, &'static ContactGraph>,
-        Query<'static, 'static, &'static mut ConstraintGraph>,
-        Query<'static, 'static, &'static mut PhysicsIslands>,
+        Query<
+            'static,
+            'static,
+            (
+                Entity,
+                &'static mut ContactStatusChangeQueue,
+                &'static ContactGraph,
+                &'static mut ConstraintGraph,
+                &'static mut PhysicsIslands,
+            ),
+            With<crate::world::PhysicsWorld>,
+        >,
         Query<
             'static,
             'static,
@@ -425,42 +456,47 @@ impl Command for FlushContactStatusChangeQueue {
         // The cached system state may not exist if the `SolverPlugin` was not added.
         world.try_resource_scope(
             |world, mut state: Mut<CachedContactStatusChangeSystemState>| {
-                let mut islands_to_wake: Vec<IslandId> = Vec::new();
-
+                let mut wakes: Vec<(Entity, Vec<IslandId>)> = Vec::new();
                 {
-                    let (
-                        mut changes,
-                        contact_graph_query,
-                        mut constraint_graph_query,
-                        mut islands_query,
-                        mut body_islands,
-                    ) = state.0.get_mut(world).unwrap();
-                    let contact_graph = contact_graph_query.single().unwrap();
-                    let mut constraint_graph = constraint_graph_query.single_mut().unwrap();
-                    let mut islands = islands_query.single_mut().ok();
+                    let (mut worlds, mut body_islands) =
+                        state.0.get_mut(world).expect("Failed to get system state");
 
-                    for change in changes.drain(..) {
-                        apply_contact_status_change(
-                            change,
-                            &contact_graph,
-                            &mut constraint_graph,
-                            islands.as_deref_mut(),
-                            &mut body_islands,
-                            &mut islands_to_wake,
-                        );
+                    for (
+                        world_entity,
+                        mut changes,
+                        contact_graph,
+                        mut constraint_graph,
+                        mut islands,
+                    ) in worlds.iter_mut()
+                    {
+                        if changes.is_empty() {
+                            continue;
+                        }
+
+                        let mut islands_to_wake: Vec<IslandId> = Vec::new();
+
+                        for change in changes.drain(..) {
+                            apply_contact_status_change(
+                                change,
+                                contact_graph,
+                                &mut constraint_graph,
+                                Some(&mut islands),
+                                &mut body_islands,
+                                &mut islands_to_wake,
+                            );
+                        }
+
+                        if !islands_to_wake.is_empty() {
+                            islands_to_wake.sort_unstable();
+                            islands_to_wake.dedup();
+                            wakes.push((world_entity, islands_to_wake));
+                        }
                     }
                 }
 
-                if !islands_to_wake.is_empty() {
-                    islands_to_wake.sort_unstable();
-                    islands_to_wake.dedup();
-
-                    // Wake up the islands that were previously sleeping.
-                    WakeIslands {
-                        world_entity: world.resource::<crate::world::MainPhysicsWorldEntity>().0,
-                        islands: islands_to_wake,
-                    }
-                    .apply(world);
+                // Wake the islands that were previously sleeping.
+                for (world_entity, islands) in wakes {
+                    (WakeIslands { world_entity, islands }).apply(world);
                 }
             },
         );

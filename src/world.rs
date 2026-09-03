@@ -27,7 +27,10 @@ use crate::{
     },
     collision::{
         CollisionDiagnostics,
-        narrow_phase::{system_param::ContactStatusBits, NarrowPhaseConfig},
+        narrow_phase::{
+            system_param::{ContactStatusBits, ContactStatusChangeQueue},
+            NarrowPhaseConfig,
+        },
     },
     dynamics::{
         rigid_body::{DefaultFriction, DefaultRestitution},
@@ -75,6 +78,7 @@ use crate::{
     PhysicsIslands,
     AwakeIslandBitVec,
     ContactStatusBits,
+    ContactStatusChangeQueue,
     ColliderTreeOptimization,
     OptimizationTasks,
     LastDynamicKinematicAabbUpdate,
