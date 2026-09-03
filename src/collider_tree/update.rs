@@ -41,8 +41,7 @@ impl<C: AnyCollider> Default for ColliderTreeUpdatePlugin<C> {
 impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
     fn build(&self, app: &mut App) {
         // Initialize resources.
-        app.init_resource::<MovedProxies>()
-            .init_resource::<EnlargedProxies>();
+        // MovedProxies / EnlargedProxies live on the PhysicsWorld entity.
 
         // Add systems for updating collider AABBs before physics step.
         // This accounts for manually moved colliders.
@@ -611,7 +610,7 @@ pub(crate) struct LastDynamicKinematicAabbUpdate(Tick);
 /// previous [`EnlargedAabb`], or whose collider has been added to a [`ColliderTree`].
 ///
 /// [`ColliderTree`]: crate::collider_tree::ColliderTree
-#[derive(Resource, Default, Clone)]
+#[derive(Component, Default, Clone)]
 pub struct MovedProxies {
     /// A vector of moved proxy keys.
     proxies: Vec<ColliderTreeProxyKey>,
@@ -678,7 +677,7 @@ impl MovedProxies {
 /// [`ColliderAabb`] has moved outside of the previous [`EnlargedAabb`].
 ///
 /// Set bits indicate [`ProxyId`]s of moved proxies.
-#[derive(Resource, Default)]
+#[derive(Component, Default)]
 pub struct EnlargedProxies {
     // Note: Box2D indexes by shape ID, so it only needs one bit vector.
     //       In our case, we would instead index by entity ID, but this would

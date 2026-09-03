@@ -169,10 +169,10 @@ where
 pub struct CollisionEventSystems;
 
 /// A resource for configuring the [narrow phase](NarrowPhasePlugin).
-#[derive(Resource, Reflect, Clone, Debug, PartialEq)]
+#[derive(Component, Reflect, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, Resource, PartialEq)]
+#[reflect(Debug, Component, PartialEq)]
 pub struct NarrowPhaseConfig {
     /// A small, positive contact tolerance to help ensure that contacts are not missed
     /// due to numerical issues or solver jitter for objects that are in continuous
