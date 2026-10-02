@@ -24,7 +24,7 @@ default = [
 2d = []
 f64 = []
 
-debug-plugin = ["bevy/bevy_gizmos", "bevy/bevy_render"]
+debug-plugin = ["bevy/bevy_gizmos"]
 simd = ["parry2d?/simd-stable", "parry2d-f64?/simd-stable"]
 parallel = ["bevy/multi_threaded", "parry2d?/parallel", "parry2d-f64?/parallel"]
 enhanced-determinism = [
