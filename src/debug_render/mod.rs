@@ -7,7 +7,7 @@
 mod configuration;
 mod gizmos;
 
-use bevy_math::bounding::Aabb3d;
+use bevy_shape::Aabb3d;
 pub use configuration::*;
 pub use gizmos::*;
 
@@ -232,7 +232,7 @@ fn debug_render_aabbs(
     #[cfg(feature = "3d")]
     for (entity, aabb, collider_rb, render_config) in &aabbs {
         if let Some(mut color) = render_config.map_or(config.aabb_color, |c| c.aabb_color) {
-            use bevy_math::bounding::Aabb3d;
+            use bevy_shape::Aabb3d;
 
             let collider_rb = collider_rb.map_or(entity, |c| c.body);
 
@@ -568,7 +568,7 @@ fn debug_render_islands(
             }
             #[cfg(feature = "3d")]
             {
-                use bevy_math::bounding::Aabb3d;
+                use bevy_shape::Aabb3d;
 
                 gizmos.aabb_3d(
                     Aabb3d {
