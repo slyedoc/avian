@@ -23,6 +23,7 @@ use crate::{
         },
     },
     prelude::*,
+    world::PhysicsWorldLookup,
 };
 use bevy::{
     camera::visibility::VisibilitySystems,
@@ -155,8 +156,9 @@ impl Plugin for PhysicsDebugPlugin {
 
 #[allow(clippy::type_complexity)]
 fn debug_render_axes(
-    main_world: Res<MainPhysicsWorldEntity>,
+    lookup: PhysicsWorldLookup,
     bodies: Query<(
+        Entity,
         &GlobalTransform,
         &ComputedCenterOfMass,
         Has<Sleeping>,
@@ -166,9 +168,12 @@ fn debug_render_axes(
     store: Res<GizmoConfigStore>,
     world_length_unit: Query<&PhysicsLengthUnit, With<PhysicsWorld>>,
 ) {
-    let Ok(length_unit) = world_length_unit.get(main_world.0) else { return; };
     let config = store.config::<PhysicsGizmos>().1;
-    for (transform, local_com, sleeping, render_config) in &bodies {
+    for (entity, transform, local_com, sleeping, render_config) in &bodies {
+        // Drawn for the body's world: its views show them.
+        let world = lookup.world_entity_of(entity);
+        let Ok(length_unit) = world_length_unit.get(world) else { continue };
+        gizmos.set_owner(Some(world));
         let pos = Position::from(transform);
         let rot = Rotation::from(transform);
 
@@ -205,6 +210,7 @@ fn debug_render_axes(
             }
         }
     }
+    gizmos.set_owner(None);
 }
 
 fn debug_render_aabbs(
@@ -215,12 +221,14 @@ fn debug_render_aabbs(
         Option<&DebugRender>,
     )>,
     sleeping: Query<(), With<Sleeping>>,
+    lookup: PhysicsWorldLookup,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
 ) {
     let config = store.config::<PhysicsGizmos>().1;
     #[cfg(feature = "2d")]
     for (entity, aabb, collider_rb, render_config) in &aabbs {
+        gizmos.set_owner(Some(lookup.world_entity_of(entity)));
         if let Some(mut color) = render_config.map_or(config.aabb_color, |c| c.aabb_color) {
             let collider_rb = collider_rb.map_or(entity, |c| c.body);
 
@@ -240,6 +248,7 @@ fn debug_render_aabbs(
 
     #[cfg(feature = "3d")]
     for (entity, aabb, collider_rb, render_config) in &aabbs {
+        gizmos.set_owner(Some(lookup.world_entity_of(entity)));
         if let Some(mut color) = render_config.map_or(config.aabb_color, |c| c.aabb_color) {
             use bevy_shape::Aabb3d;
 
@@ -265,29 +274,32 @@ fn debug_render_aabbs(
             );
         }
     }
+    gizmos.set_owner(None);
 }
 
 fn debug_render_bvh(
-    main_world: Res<MainPhysicsWorldEntity>,
-    world_bvh: Query<&ColliderTrees, With<PhysicsWorld>>,
+    world_bvh: Query<(Entity, &ColliderTrees), With<PhysicsWorld>>,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
 ) {
-    let Ok(bvh) = world_bvh.get(main_world.0) else { return; };
     let config = store.config::<PhysicsGizmos>().1;
 
     let Some(collider_tree_color) = config.collider_tree_color else {
         return;
     };
 
-    for node in bvh.iter_trees().flat_map(|tree| tree.bvh.nodes.iter()) {
-        if node.prim_count == 0 && node.aabb.valid() {
-            gizmos.aabb_3d(
-                Aabb3d::from_min_max(node.aabb.min.to_array(), node.aabb.max.to_array()),
-                Transform::IDENTITY,
-                collider_tree_color,
-            );
-        }
+    for (world, bvh) in &world_bvh {
+        gizmos.for_entity(world, |gizmos| {
+            for node in bvh.iter_trees().flat_map(|tree| tree.bvh.nodes.iter()) {
+                if node.prim_count == 0 && node.aabb.valid() {
+                    gizmos.aabb_3d(
+                        Aabb3d::from_min_max(node.aabb.min.to_array(), node.aabb.max.to_array()),
+                        Transform::IDENTITY,
+                        collider_tree_color,
+                    );
+                }
+            }
+        });
     }
 }
 
@@ -308,11 +320,13 @@ fn debug_render_colliders(
     body_indices: Query<&SolverBodyIndex>,
     solver_bodies: Res<SolverBodies>,
     shape_intersection_tests: Res<TrackedShapeIntersections>,
+    lookup: PhysicsWorldLookup,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
 ) {
     let config = store.config::<PhysicsGizmos>().1;
     for (entity, collider, transform, collider_rb, render_config) in &mut colliders {
+        gizmos.set_owner(Some(lookup.world_entity_of(entity)));
         let position = Position::from(transform);
         let rotation = Rotation::from(transform);
 
@@ -359,25 +373,25 @@ fn debug_render_colliders(
             gizmos.draw_collider(collider, position.0, rotation, color);
         }
     }
+    gizmos.set_owner(None);
 }
 
 fn debug_render_contacts(
-    main_world: Res<MainPhysicsWorldEntity>,
-    collisions: Collisions,
+    worlds: Query<(Entity, &ContactGraph, &PhysicsLengthUnit), With<PhysicsWorld>>,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
     time: Res<Time<Substeps>>,
-    world_length_unit: Query<&PhysicsLengthUnit, With<PhysicsWorld>>,
 ) {
     let delta_secs = time.delta_secs();
-    let Ok(length_unit) = world_length_unit.get(main_world.0) else { return; };
     let config = store.config::<PhysicsGizmos>().1;
 
     if config.contact_point_color.is_none() && config.contact_normal_color.is_none() {
         return;
     }
 
-    for contacts in collisions.iter() {
+    for (world, graph, length_unit) in &worlds {
+    gizmos.set_owner(Some(world));
+    for contacts in graph.iter_active_touching().chain(graph.iter_sleeping_touching()) {
         for manifold in contacts.manifolds.iter() {
             for contact in manifold.points.iter() {
                 // Don't render contacts that aren't penetrating
@@ -418,6 +432,8 @@ fn debug_render_contacts(
             }
         }
     }
+    }
+    gizmos.set_owner(None);
 }
 
 /// A trait for rendering debug information about constraints.
@@ -441,13 +457,15 @@ pub trait DebugRenderConstraint<const N: usize>: EntityConstraint<N> {
 /// A system that renders all constraints that implement the [`DebugRenderConstraint`] trait.
 pub fn debug_render_constraint<T: Component + DebugRenderConstraint<N>, const N: usize>(
     bodies: Query<&GlobalTransform>,
-    constraints: Query<&T>,
+    constraints: Query<(Entity, &T)>,
+    lookup: PhysicsWorldLookup,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
     mut context: StaticSystemParam<T::Context>,
 ) {
     let config = store.config::<PhysicsGizmos>().1;
-    for constraint in &constraints {
+    for (entity, constraint) in &constraints {
+        gizmos.set_owner(Some(lookup.world_entity_of(entity)));
         if let Ok(bodies) = bodies.get_many(constraint.entities()) {
             let positions: [RVector; N] = bodies
                 .iter()
@@ -465,18 +483,21 @@ pub fn debug_render_constraint<T: Component + DebugRenderConstraint<N>, const N:
             constraint.debug_render(positions, rotations, &mut context, &mut gizmos, config);
         }
     }
+    gizmos.set_owner(None);
 }
 
 fn debug_render_raycasts(
-    main_world: Res<MainPhysicsWorldEntity>,
-    query: Query<(&RayCaster, &RayHits)>,
+    lookup: PhysicsWorldLookup,
+    query: Query<(Entity, &RayCaster, &RayHits)>,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
     world_length_unit: Query<&PhysicsLengthUnit, With<PhysicsWorld>>,
 ) {
-    let Ok(length_unit) = world_length_unit.get(main_world.0) else { return; };
     let config = store.config::<PhysicsGizmos>().1;
-    for (ray, hits) in &query {
+    for (entity, ray, hits) in &query {
+        let world = lookup.world_entity_of(entity);
+        let Ok(length_unit) = world_length_unit.get(world) else { continue };
+        gizmos.set_owner(Some(world));
         let ray_color = config.raycast_color.unwrap_or(Color::NONE);
         let point_color = config.raycast_point_color.unwrap_or(Color::NONE);
         let normal_color = config.raycast_normal_color.unwrap_or(Color::NONE);
@@ -493,6 +514,7 @@ fn debug_render_raycasts(
             length_unit.0,
         );
     }
+    gizmos.set_owner(None);
 }
 
 #[cfg(all(
@@ -500,15 +522,17 @@ fn debug_render_raycasts(
     any(feature = "parry-f32", feature = "parry-f64")
 ))]
 fn debug_render_shapecasts(
-    main_world: Res<MainPhysicsWorldEntity>,
-    query: Query<(&ShapeCaster, &ShapeHits)>,
+    lookup: PhysicsWorldLookup,
+    query: Query<(Entity, &ShapeCaster, &ShapeHits)>,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
     world_length_unit: Query<&PhysicsLengthUnit, With<PhysicsWorld>>,
 ) {
-    let Ok(length_unit) = world_length_unit.get(main_world.0) else { return; };
     let config = store.config::<PhysicsGizmos>().1;
-    for (shape_caster, hits) in &query {
+    for (entity, shape_caster, hits) in &query {
+        let world = lookup.world_entity_of(entity);
+        let Ok(length_unit) = world_length_unit.get(world) else { continue };
+        gizmos.set_owner(Some(world));
         let ray_color = config.shapecast_color.unwrap_or(Color::NONE);
         let shape_color = config.shapecast_shape_color.unwrap_or(Color::NONE);
         let point_color = config.shapecast_point_color.unwrap_or(Color::NONE);
@@ -529,19 +553,20 @@ fn debug_render_shapecasts(
             length_unit.0,
         );
     }
+    gizmos.set_owner(None);
 }
 
 fn debug_render_islands(
-    main_world: Res<MainPhysicsWorldEntity>,
-    world_islands: Query<&PhysicsIslands, With<PhysicsWorld>>,
+    world_islands: Query<(Entity, &PhysicsIslands), With<PhysicsWorld>>,
     bodies: Query<(&RigidBodyColliders, &BodyIslandNode)>,
     aabbs: Query<&ColliderAabb>,
     mut gizmos: Gizmos<PhysicsGizmos>,
     store: Res<GizmoConfigStore>,
 ) {
-    let Ok(islands) = world_islands.get(main_world.0) else { return; };
     let config = store.config::<PhysicsGizmos>().1;
 
+    for (world, islands) in &world_islands {
+    gizmos.set_owner(Some(world));
     for island in islands.iter() {
         if let Some(mut color) = config.island_color {
             // If the island is sleeping, multiply the color by the sleeping color multiplier
@@ -600,6 +625,8 @@ fn debug_render_islands(
             }
         }
     }
+    }
+    gizmos.set_owner(None);
 }
 
 /// Caches whether physics gizmos are enabled on [`TrackedSpatialQueries`].
