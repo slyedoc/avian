@@ -358,7 +358,7 @@ impl Not for LayerMask {
 #[component(immutable)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, Component, PartialEq)]
+#[reflect(Debug, Component, Default, PartialEq)]
 pub struct CollisionLayers {
     /// The layers that an entity belongs to.
     #[doc(alias = "groups", alias = "layers")]

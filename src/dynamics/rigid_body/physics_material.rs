@@ -134,7 +134,7 @@ pub struct DefaultRestitution(pub Restitution);
 #[derive(Reflect, Clone, Copy, Component, Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, Component, PartialEq)]
+#[reflect(Debug, Component, Default, PartialEq)]
 pub struct Friction {
     /// Coefficient of dynamic friction. Applied when bodies are sliding relative to each other.
     ///
@@ -305,7 +305,7 @@ impl From<f32> for Friction {
 #[derive(Reflect, Clone, Copy, Component, Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, Component, PartialEq)]
+#[reflect(Debug, Component, Default, PartialEq)]
 pub struct Restitution {
     /// The [coefficient of restitution](https://en.wikipedia.org/wiki/Coefficient_of_restitution).
     ///

@@ -28,7 +28,7 @@ use derive_more::derive::From;
 #[derive(Reflect, Clone, Copy, Component, Debug, Deref, DerefMut, PartialEq, PartialOrd, From)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, Component, PartialEq)]
+#[reflect(Debug, Component, Default, PartialEq)]
 pub struct ColliderDensity(pub f32);
 
 impl Default for ColliderDensity {

@@ -293,5 +293,5 @@ pub type OnCollisionEnd = CollisionEnd;
 #[derive(Component, Clone, Copy, Debug, Default, Reflect)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Component, Debug)]
+#[reflect(Component, Debug, Default)]
 pub struct CollisionEventsEnabled;
