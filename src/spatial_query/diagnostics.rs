@@ -2,15 +2,15 @@ use core::time::Duration;
 
 use bevy::{
     diagnostic::DiagnosticPath,
-    prelude::{ReflectResource, Resource},
+    prelude::{Component, ReflectComponent},
     reflect::Reflect,
 };
 
 use crate::diagnostics::{PhysicsDiagnostics, impl_diagnostic_paths};
 
 /// Diagnostics for spatial queries.
-#[derive(Resource, Debug, Default, Reflect)]
-#[reflect(Resource, Debug)]
+#[derive(Component, Debug, Default, Reflect)]
+#[reflect(Component, Debug)]
 pub struct SpatialQueryDiagnostics {
     /// Time spent updating [`RayCaster`](super::RayCaster) hits.
     pub update_ray_casters: Duration,

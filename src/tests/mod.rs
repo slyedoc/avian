@@ -16,6 +16,8 @@ use core::time::Duration;
 #[cfg(all(feature = "2d", feature = "enhanced-determinism"))]
 mod determinism_2d;
 
+use crate::set_main_world_component as set_component;
+
 fn create_app() -> App {
     let mut app = App::new();
 
@@ -105,7 +107,7 @@ fn it_loads_plugin_without_errors() -> Result<(), Box<dyn core::error::Error>> {
 fn body_with_velocity_moves() {
     let mut app = create_app();
 
-    app.insert_resource(Gravity::ZERO);
+    set_component(&mut app, Gravity::ZERO);
 
     app.add_systems(Startup, |mut commands: Commands| {
         // move right at 1 unit per second

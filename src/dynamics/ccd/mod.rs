@@ -592,11 +592,23 @@ fn solve_continuous(
     colliders: Query<(&Collider, &Position, &Rotation)>,
     ccd_query: Query<CcdBodyQuery>,
     mut bodies: ResMut<SolverBodies>,
-    trees: Res<ColliderTrees>,
-    mut contact_graph: ResMut<ContactGraph>,
     time: Res<Time>,
-    mut diagnostics: ResMut<SolverDiagnostics>,
+    mut worlds: Query<
+        (
+            &ColliderTrees,
+            &mut ContactGraph,
+            &NarrowPhaseConfig,
+            &mut SolverDiagnostics,
+        ),
+        With<PhysicsWorld>,
+    >,
+    main_world: Res<MainPhysicsWorldEntity>,
 ) {
+    let Ok((trees, mut contact_graph, narrow_phase_config, mut diagnostics)) =
+        worlds.get_mut(main_world.0)
+    else {
+        return;
+    };
     let start = crate::utils::Instant::now();
 
     let delta_secs = time.delta_secs();

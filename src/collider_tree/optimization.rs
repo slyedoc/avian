@@ -21,10 +21,7 @@ pub(super) struct ColliderTreeOptimizationPlugin;
 
 impl Plugin for ColliderTreeOptimizationPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ColliderTreeOptimization>();
-
-        #[cfg(all(not(target_arch = "wasm32"), not(target_os = "unknown")))]
-        app.init_resource::<OptimizationTasks>();
+        // ColliderTreeOptimization and OptimizationTasks are on the PhysicsWorld entity.
 
         app.add_systems(
             PhysicsSchedule,
@@ -39,7 +36,7 @@ impl Plugin for ColliderTreeOptimizationPlugin {
 
 /// Settings for optimizing each [`ColliderTree`].
 // TODO: Per-tree settings could be useful.
-#[derive(Resource, Debug, PartialEq, Reflect)]
+#[derive(Component, Debug, PartialEq, Reflect)]
 pub struct ColliderTreeOptimization {
     /// The optimization mode for the collider tree.
     ///
@@ -207,8 +204,8 @@ impl OptimizationJob {
 /// The jobs are still claimed individually, so [`finish_optimize_trees`]
 /// can pick up the ones the task has not reached yet and run them alongside it.
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "unknown")))]
-#[derive(Resource, Default)]
-struct OptimizationTasks {
+#[derive(Component, Default)]
+pub(crate) struct OptimizationTasks {
     jobs: Vec<Arc<OptimizationJob>>,
     task: Option<Task<()>>,
 }
@@ -219,12 +216,18 @@ struct OptimizationTasks {
 /// runs concurrently with the simulation step. Otherwise, the optimization is performed
 /// in-place on the main thread.
 fn optimize_trees(
-    mut collider_trees: ResMut<ColliderTrees>,
-    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "unknown")))]
-    mut optimization_tasks: ResMut<OptimizationTasks>,
-    optimization_settings: Res<ColliderTreeOptimization>,
-    mut diagnostics: ResMut<ColliderTreeDiagnostics>,
+    mut worlds: Query<
+        (
+            Entity,
+            &mut ColliderTrees,
+            &mut OptimizationTasks,
+            &ColliderTreeOptimization,
+            &mut ColliderTreeDiagnostics,
+        ),
+        With<PhysicsWorld>,
+    >,
 ) {
+    for (world_entity, mut collider_trees, mut optimization_tasks, optimization_settings, mut diagnostics) in worlds.iter_mut() {
     let start = crate::utils::Instant::now();
 
     // We cannot block on wasm.
@@ -266,6 +269,7 @@ fn optimize_trees(
                 workspace: core::mem::take(&mut tree.workspace),
             };
 
+            let _ = world_entity;
             optimization_tasks.jobs.push(Arc::new(OptimizationJob {
                 tree: Mutex::new(new_tree),
                 tree_type,
@@ -293,6 +297,7 @@ fn optimize_trees(
     }
 
     diagnostics.optimize += start.elapsed();
+    }
 }
 
 fn optimize_tree_in_place(tree: &mut ColliderTree, optimization_strategy: TreeOptimizationMode) {
@@ -326,11 +331,13 @@ fn optimize_tree_in_place(tree: &mut ColliderTree, optimization_strategy: TreeOp
 /// Completes the [`ColliderTree`] optimization jobs started in [`optimize_trees`].
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "unknown")))]
 fn finish_optimize_trees(
-    mut collider_trees: ResMut<ColliderTrees>,
-    mut optimization_tasks: ResMut<OptimizationTasks>,
-    mut diagnostics: ResMut<ColliderTreeDiagnostics>,
+    mut worlds: Query<
+        (&mut ColliderTrees, &mut OptimizationTasks, &mut ColliderTreeDiagnostics),
+        With<PhysicsWorld>,
+    >,
 ) {
-    let start = crate::utils::Instant::now();
+    for (mut collider_trees, mut optimization_tasks, mut diagnostics) in worlds.iter_mut() {
+        let start = crate::utils::Instant::now();
 
     let Some(task) = optimization_tasks.task.take() else {
         return;
@@ -361,5 +368,6 @@ fn finish_optimize_trees(
         collider_tree.workspace = core::mem::take(&mut tree.workspace);
     }
 
-    diagnostics.optimize += start.elapsed();
+        diagnostics.optimize += start.elapsed();
+    }
 }

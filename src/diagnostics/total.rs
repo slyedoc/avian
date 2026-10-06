@@ -8,6 +8,7 @@ use bevy::{
 use crate::diagnostics::impl_diagnostic_paths;
 
 use super::{AppDiagnosticsExt, PhysicsDiagnostics, PhysicsSchedule, PhysicsStepSystems};
+use crate::world::PhysicsWorld;
 
 /// A plugin that adds diagnostics for total physics timers and counters.
 pub struct PhysicsTotalDiagnosticsPlugin;
@@ -43,8 +44,8 @@ impl Plugin for PhysicsTotalDiagnosticsPlugin {
 }
 
 /// Diagnostics for total physics timers and counters.
-#[derive(Resource, Debug, Default, Reflect)]
-#[reflect(Resource, Debug)]
+#[derive(Component, Debug, Default, Reflect)]
+#[reflect(Component, Debug)]
 pub struct PhysicsTotalDiagnostics {
     /// The current physics step number.
     pub step_number: u32,
@@ -74,11 +75,13 @@ impl_diagnostic_paths! {
 }
 
 fn increment_physics_step_number(
-    mut diagnostics: ResMut<PhysicsTotalDiagnostics>,
+    mut worlds: Query<&mut PhysicsTotalDiagnostics, With<PhysicsWorld>>,
     mut step: Local<u32>,
 ) {
     *step += 1;
-    diagnostics.step_number = *step;
+    for mut diagnostics in worlds.iter_mut() {
+        diagnostics.step_number = *step;
+    }
 }
 
 /// The time at which the physics step started.
@@ -92,9 +95,12 @@ fn update_physics_step_start(mut start: ResMut<PhysicsStepStart>) {
 
 fn update_step_time(
     start: Res<PhysicsStepStart>,
-    mut diagnostics: ResMut<PhysicsTotalDiagnostics>,
+    mut worlds: Query<&mut PhysicsTotalDiagnostics, With<PhysicsWorld>>,
 ) {
-    diagnostics.step_time = start.0.elapsed();
+    let elapsed = start.0.elapsed();
+    for mut diagnostics in worlds.iter_mut() {
+        diagnostics.step_time = elapsed;
+    }
 }
 
 /// Updates the time spent on the physics step not covered by other diagnostics.

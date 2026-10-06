@@ -4,7 +4,7 @@
 
 pub use super::velocity_project::*;
 
-use crate::{collision::collider::contact_query::contact_manifolds, prelude::*};
+use crate::{collision::collider::contact_query::contact_manifolds, prelude::*, world::PhysicsWorld};
 use bevy::{ecs::system::SystemParam, prelude::*};
 use core::time::Duration;
 
@@ -82,7 +82,8 @@ pub struct MoveAndSlide<'w, 's> {
     >,
     /// A units-per-meter scaling factor that adjusts some thresholds and tolerances
     /// to the scale of the world for better behavior.
-    pub length_unit: Res<'w, PhysicsLengthUnit>,
+    pub length_unit: Query<'w, 's, &'static PhysicsLengthUnit, With<PhysicsWorld>>,
+    main_world: Res<'w, MainPhysicsWorldEntity>,
 }
 
 /// Configuration for [`MoveAndSlide::move_and_slide`].
@@ -495,7 +496,7 @@ impl<'w, 's> MoveAndSlide<'w, 's> {
 
         let mut position = shape_position;
         let mut time_left = delta_time.as_secs_f32();
-        let skin_width = self.length_unit.0 * config.skin_width;
+        let skin_width = self.length_unit.get(self.main_world.0).unwrap().0 * config.skin_width;
 
         // Initial depenetration pass
         let depenetration_offset =
@@ -886,12 +887,12 @@ impl<'w, 's> MoveAndSlide<'w, 's> {
             shape,
             shape_position,
             shape_rotation,
-            self.length_unit.0 * config.skin_width,
+            self.length_unit.get(self.main_world.0).unwrap().0 * config.skin_width,
             filter,
             |_, contact_point, normal| {
                 intersections.push((
                     normal,
-                    contact_point.penetration + self.length_unit.0 * config.skin_width,
+                    contact_point.penetration + self.length_unit.get(self.main_world.0).unwrap().0 * config.skin_width,
                 ));
                 true
             },
@@ -985,7 +986,7 @@ impl<'w, 's> MoveAndSlide<'w, 's> {
             let mut total_error = 0.0;
 
             for (normal, dist) in intersections {
-                if *dist > self.length_unit.0 * config.penetration_rejection_threshold {
+                if *dist > self.length_unit.get(self.main_world.0).unwrap().0 * config.penetration_rejection_threshold {
                     continue;
                 }
                 let error = (dist - fixup.dot(**normal)).max(0.0);
@@ -993,7 +994,7 @@ impl<'w, 's> MoveAndSlide<'w, 's> {
                 fixup += error * **normal;
             }
 
-            if total_error < self.length_unit.0 * config.max_depenetration_error {
+            if total_error < self.length_unit.get(self.main_world.0).unwrap().0 * config.max_depenetration_error {
                 break;
             }
         }

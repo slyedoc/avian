@@ -1,6 +1,6 @@
 use bevy::{
     diagnostic::DiagnosticPath,
-    prelude::{ReflectResource, Resource},
+    prelude::{Component, ReflectComponent},
     reflect::Reflect,
 };
 use core::time::Duration;
@@ -8,8 +8,8 @@ use core::time::Duration;
 use crate::diagnostics::{PhysicsDiagnostics, impl_diagnostic_paths};
 
 /// Diagnostics for [collider trees](crate::collider_tree).
-#[derive(Resource, Debug, Default, Reflect)]
-#[reflect(Resource, Debug)]
+#[derive(Component, Debug, Default, Reflect)]
+#[reflect(Component, Debug)]
 pub struct ColliderTreeDiagnostics {
     /// Time spent optimizing [collider trees](crate::collider_tree).
     pub optimize: Duration,

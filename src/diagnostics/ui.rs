@@ -505,12 +505,12 @@ fn update_timers(
 }
 
 fn update_graph_color_text(
-    constraint_graph: Option<Res<ConstraintGraph>>,
+    constraint_graph: Query<&ConstraintGraph>,
     children: Single<(Entity, &Children), With<GraphColorText>>,
     mut text_span_query: Query<&mut Text>,
     mut commands: Commands,
 ) {
-    let Some(graph) = constraint_graph else {
+    let Ok(graph) = constraint_graph.single() else {
         return;
     };
 

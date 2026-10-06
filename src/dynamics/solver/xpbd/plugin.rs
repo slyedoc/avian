@@ -237,10 +237,14 @@ pub fn warm_start_xpbd_motors<
     index_query: Query<&SolverBodyIndex, Without<RigidBodyDisabled>>,
     mut joints: Query<(&C, &mut C::SolverData), (Without<RigidBody>, Without<JointDisabled>)>,
     time: Res<Time>,
-    solver_config: Res<SolverConfig>,
+    worlds: Query<&SolverConfig, With<PhysicsWorld>>,
+    main_world: Res<MainPhysicsWorldEntity>,
 ) where
     C::SolverData: Component<Mutability = Mutable>,
 {
+    let Ok(solver_config) = worlds.get(main_world.0) else {
+        return;
+    };
     let delta_secs = time.delta_secs();
 
     let access = solver_bodies.access();
