@@ -43,7 +43,7 @@ impl CoefficientCombine {
 #[derive(Component, Clone, Copy, Debug, Default, Deref, DerefMut, PartialEq, Reflect)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, Default, PartialEq)]
+#[reflect(Debug, Component, Default, PartialEq)]
 pub struct DefaultFriction(pub Friction);
 
 /// A component for the default [`Restitution`] to use for physics objects.
@@ -54,7 +54,7 @@ pub struct DefaultFriction(pub Friction);
 #[derive(Component, Clone, Copy, Debug, Default, Deref, DerefMut, PartialEq, Reflect)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, Default, PartialEq)]
+#[reflect(Debug, Component, Default, PartialEq)]
 pub struct DefaultRestitution(pub Restitution);
 
 /// A component for [dry friction], controlling how strongly a [rigid body] or [collider]

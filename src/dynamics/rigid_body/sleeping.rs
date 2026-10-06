@@ -139,7 +139,7 @@ pub type TimeSleeping = SleepTimer;
 #[derive(Component, Clone, Copy, Debug, PartialEq, PartialOrd, Reflect)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, Default, PartialEq)]
+#[reflect(Debug, Component, Default, PartialEq)]
 pub struct TimeToSleep(pub f32);
 
 /// Deprecated alias for [`TimeToSleep`].

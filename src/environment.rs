@@ -1,14 +1,14 @@
-//! Physics world components and management.
+//! Physics environment components and management.
 //!
-//! A [`PhysicsWorld`] entity holds all per-world physics state as components
+//! A [`PhysicsEnvironment`] entity holds all per-environment physics state as components
 //! (e.g. [`Gravity`], [`SolverConfig`], [`ColliderTrees`]).
 //!
-//! The [`MainPhysicsWorld`] marker identifies the default world,
-//! spawned automatically by [`PhysicsWorldPlugin`].
+//! The [`MainPhysicsEnvironment`] marker identifies the default environment,
+//! spawned automatically by [`PhysicsEnvironmentPlugin`].
 //!
-//! Physics entities are assigned to a world by being descendants of a
-//! [`PhysicsWorld`] entity in the hierarchy. Entities without a
-//! [`PhysicsWorld`] ancestor fall back to the [`MainPhysicsWorld`].
+//! Physics entities are assigned to an environment by being descendants of a
+//! [`PhysicsEnvironment`] entity in the hierarchy. Entities without a
+//! [`PhysicsEnvironment`] ancestor fall back to the [`MainPhysicsEnvironment`].
 
 use bevy::{
     ecs::{relationship::Relationship, system::SystemParam, world::DeferredWorld},
@@ -18,42 +18,44 @@ use bevy::{
 #[cfg(feature = "bevy_diagnostic")]
 use crate::diagnostics::{PhysicsEntityDiagnostics, PhysicsTotalDiagnostics};
 use crate::{
-    dynamics::joints::joint_graph::JointGraph,
     collider_tree::{
-        optimization::OptimizationTasks,
-        update::LastDynamicKinematicAabbUpdate,
-        ColliderTreeDiagnostics, ColliderTreeProxy, ColliderTreeProxyFlags,
-        ColliderTreeProxyKey, ColliderTreeType, ColliderTrees, EnlargedProxies, MovedProxies,
+        ColliderTreeDiagnostics, ColliderTreeProxy, ColliderTreeProxyFlags, ColliderTreeProxyKey,
+        ColliderTreeType, ColliderTrees, EnlargedProxies, MovedProxies,
+        optimization::OptimizationTasks, update::LastDynamicKinematicAabbUpdate,
     },
     collision::{
         CollisionDiagnostics,
         narrow_phase::{
-            system_param::{ContactStatusBits, ContactStatusChangeQueue},
             NarrowPhaseConfig,
+            system_param::{ContactStatusBits, ContactStatusChangeQueue},
         },
     },
+    dynamics::joints::joint_graph::JointGraph,
     dynamics::{
         rigid_body::{DefaultFriction, DefaultRestitution},
         solver::{
+            ContactConstraints, ContactSoftnessCoefficients, SolverConfig, SolverDiagnostics,
             constraint_graph::ConstraintGraph,
-            islands::{BodyIslandNode, IslandId, PhysicsIslands, sleeping::{AwakeIslandBitVec, WakeIslands}},
-            SolverDiagnostics,
-            ContactConstraints, ContactSoftnessCoefficients, SolverConfig,
+            islands::{
+                BodyIslandNode, IslandId, PhysicsIslands,
+                sleeping::{AwakeIslandBitVec, WakeIslands},
+            },
         },
     },
-    spatial_query::SpatialQueryDiagnostics,
     prelude::*,
+    spatial_query::SpatialQueryDiagnostics,
 };
 
-/// A physics world entity that holds per-world physics state as components.
+/// A physics environment entity that holds per-environment physics state as components.
 ///
-/// Each per-world component is added via `#[require]` so that
-/// spawning a `PhysicsWorld` automatically initializes all state.
+/// Each per-environment component is added via `#[require]` so that
+/// spawning a `PhysicsEnvironment` automatically initializes all state.
 ///
-/// Physics entities are assigned to a world by being descendants
-/// of a `PhysicsWorld` entity in the bevy hierarchy. Use
-/// [`PhysicsWorldLookup`] to resolve which world an entity belongs to.
-#[derive(Component, Default)]
+/// Physics entities are assigned to an environment by being descendants
+/// of a `PhysicsEnvironment` entity in the bevy hierarchy. Use
+/// [`PhysicsEnvironmentLookup`] to resolve which environment an entity belongs to.
+#[derive(Component, Default, Reflect)]
+#[reflect(Component, Default)]
 #[require(
     Transform,
     Visibility,
@@ -72,7 +74,7 @@ use crate::{
     JointGraph,
     // TODO: ContactConstraints was previously conditionally initialized via
     // NarrowPhasePlugin::generate_constraints. Now always required.
-    // May need a flag to disable constraint generation for sensor-only worlds.
+    // May need a flag to disable constraint generation for sensor-only environments.
     ContactConstraints,
     ConstraintGraph,
     PhysicsIslands,
@@ -87,87 +89,94 @@ use crate::{
     ColliderTreeDiagnostics,
     SpatialQueryDiagnostics,
 )]
-#[cfg_attr(feature = "bevy_diagnostic", require(PhysicsTotalDiagnostics, PhysicsEntityDiagnostics))]
-pub struct PhysicsWorld;
+#[cfg_attr(
+    feature = "bevy_diagnostic",
+    require(PhysicsTotalDiagnostics, PhysicsEntityDiagnostics)
+)]
+pub struct PhysicsEnvironment;
 
-/// Marker component for the default physics world.
-#[derive(Component, Default)]
-#[require(PhysicsWorld)]
-pub struct MainPhysicsWorld;
+/// Marker component for the default physics environment.
+#[derive(Component, Default, Reflect)]
+#[reflect(Component, Default)]
+#[require(PhysicsEnvironment)]
+pub struct MainPhysicsEnvironment;
 
-/// Resource holding the entity ID of the [`MainPhysicsWorld`].
+/// Resource holding the entity ID of the [`MainPhysicsEnvironment`].
 #[derive(Resource, Deref)]
-pub struct MainPhysicsWorldEntity(pub Entity);
+pub struct MainPhysicsEnvironmentEntity(pub Entity);
 
-// --- Cached physics world assignment ---
+// --- Cached physics environment assignment ---
 
-/// A cached reference to the [`PhysicsWorld`] entity that a physics entity belongs to.
+/// A cached reference to the [`PhysicsEnvironment`] entity that a physics entity belongs to.
 ///
 /// This is populated automatically by walking the hierarchy on spawn (via the
-/// [`BodyIslandNode`] `on_add` hook) and updated directly by [`TransferToWorld`].
+/// [`BodyIslandNode`] `on_add` hook) and updated directly by [`TransferToEnvironment`].
 ///
-/// [`PhysicsWorldLookup`] reads this cache for O(1) lookup instead of
+/// [`PhysicsEnvironmentLookup`] reads this cache for O(1) lookup instead of
 /// walking the [`ChildOf`] hierarchy every frame.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Reflect)]
 #[reflect(Component)]
-pub struct PhysicsWorldEntity(pub Entity);
+pub struct PhysicsEnvironmentEntity(pub Entity);
 
-// --- Hierarchy-based world lookup ---
+// --- Hierarchy-based environment lookup ---
 
-/// Finds the [`PhysicsWorld`] entity for the given entity.
+/// Finds the [`PhysicsEnvironment`] entity for the given entity.
 ///
-/// Checks the [`PhysicsWorldEntity`] cache first (O(1)), then falls back
+/// Checks the [`PhysicsEnvironmentEntity`] cache first (O(1)), then falls back
 /// to walking the [`ChildOf`] hierarchy. Works in [`DeferredWorld`] (hooks).
 ///
-/// Returns `None` if no `PhysicsWorld` is found.
-pub fn find_physics_world_in_hierarchy(world: &DeferredWorld, entity: Entity) -> Option<Entity> {
-    // Fast path: cached world assignment (set by BodyIslandNode::on_add and TransferToWorld).
-    if let Some(cached) = world.get::<PhysicsWorldEntity>(entity) {
+/// Returns `None` if no `PhysicsEnvironment` is found.
+pub fn find_physics_environment_in_hierarchy(
+    world: &DeferredWorld,
+    entity: Entity,
+) -> Option<Entity> {
+    // Fast path: cached environment assignment (set by BodyIslandNode::on_add and TransferToEnvironment).
+    if let Some(cached) = world.get::<PhysicsEnvironmentEntity>(entity) {
         return Some(cached.0);
     }
     // Slow path: walk hierarchy.
     let mut current = entity;
     loop {
-        if world.get::<PhysicsWorld>(current).is_some() {
+        if world.get::<PhysicsEnvironment>(current).is_some() {
             return Some(current);
         }
         current = world.get::<ChildOf>(current)?.get();
     }
 }
 
-/// Finds the [`PhysicsWorld`] entity for the given entity, falling back to
-/// [`MainPhysicsWorldEntity`].
+/// Finds the [`PhysicsEnvironment`] entity for the given entity, falling back to
+/// [`MainPhysicsEnvironmentEntity`].
 ///
-/// Checks the [`PhysicsWorldEntity`] cache first. Works in [`DeferredWorld`] (hooks).
-pub fn find_physics_world_or_main(world: &DeferredWorld, entity: Entity) -> Entity {
-    find_physics_world_in_hierarchy(world, entity)
-        .unwrap_or_else(|| world.resource::<MainPhysicsWorldEntity>().0)
+/// Checks the [`PhysicsEnvironmentEntity`] cache first. Works in [`DeferredWorld`] (hooks).
+pub fn find_physics_environment_or_main(world: &DeferredWorld, entity: Entity) -> Entity {
+    find_physics_environment_in_hierarchy(world, entity)
+        .unwrap_or_else(|| world.resource::<MainPhysicsEnvironmentEntity>().0)
 }
 
-/// A [`SystemParam`] that resolves which [`PhysicsWorld`] entity a given entity belongs to.
+/// A [`SystemParam`] that resolves which [`PhysicsEnvironment`] entity a given entity belongs to.
 ///
-/// Walks up the hierarchy via [`ChildOf`] to find the nearest [`PhysicsWorld`] ancestor.
-/// Falls back to [`MainPhysicsWorldEntity`] for entities without a `PhysicsWorld` ancestor.
+/// Walks up the hierarchy via [`ChildOf`] to find the nearest [`PhysicsEnvironment`] ancestor.
+/// Falls back to [`MainPhysicsEnvironmentEntity`] for entities without a `PhysicsEnvironment` ancestor.
 #[derive(SystemParam)]
-pub struct PhysicsWorldLookup<'w, 's> {
-    cache: Query<'w, 's, &'static PhysicsWorldEntity>,
+pub struct PhysicsEnvironmentLookup<'w, 's> {
+    cache: Query<'w, 's, &'static PhysicsEnvironmentEntity>,
     parents: Query<'w, 's, &'static ChildOf>,
-    worlds: Query<'w, 's, (), With<PhysicsWorld>>,
-    main_world: Res<'w, MainPhysicsWorldEntity>,
+    worlds: Query<'w, 's, (), With<PhysicsEnvironment>>,
+    main_world: Res<'w, MainPhysicsEnvironmentEntity>,
 }
 
-impl PhysicsWorldLookup<'_, '_> {
-    /// Returns the [`MainPhysicsWorldEntity`], useful when any world's config will do.
-    pub fn any_world_entity(&self) -> Entity {
+impl PhysicsEnvironmentLookup<'_, '_> {
+    /// Returns the [`MainPhysicsEnvironmentEntity`], useful when any environment's config will do.
+    pub fn any_environment(&self) -> Entity {
         self.main_world.0
     }
 
-    /// Returns the [`PhysicsWorld`] entity for the given entity.
+    /// Returns the [`PhysicsEnvironment`] entity for the given entity.
     ///
-    /// Uses the [`PhysicsWorldEntity`] cache if present (O(1)),
+    /// Uses the [`PhysicsEnvironmentEntity`] cache if present (O(1)),
     /// otherwise walks up the [`ChildOf`] hierarchy.
-    pub fn world_entity_of(&self, entity: Entity) -> Entity {
-        // Fast path: cached world assignment.
+    pub fn environment_of(&self, entity: Entity) -> Entity {
+        // Fast path: cached environment assignment.
         if let Ok(cached) = self.cache.get(entity) {
             return cached.0;
         }
@@ -185,69 +194,69 @@ impl PhysicsWorldLookup<'_, '_> {
     }
 }
 
-// --- Transfer between physics worlds ---
+// --- Transfer between physics environments ---
 
-/// An [`EntityEvent`] that transfers a physics entity to a different [`PhysicsWorld`].
+/// An [`EntityEvent`] that transfers a physics entity to a different [`PhysicsEnvironment`].
 ///
 /// This re-parents the entity and handles all physics cleanup/re-initialization:
 /// solver bodies, islands, collider tree proxies, and contacts are properly
-/// migrated from the old world to the new one.
+/// migrated from the old environment to the new one.
 ///
 /// # Reframing
 ///
 /// The body's **velocity** is reframed into the destination frame (subtract the
 /// destination frame's velocity, add the source frame's) so a body keeping pace with the
-/// source frame arrives keeping pace with the destination — see [`on_transfer_to_world`].
+/// source frame arrives keeping pace with the destination — see [`on_transfer_to_environment`].
 /// Its **pose** keeps the same frame-local `Transform` (correct for co-located frames,
-/// e.g. a docked airlock). Full world-position-preserving pose decomposition for
-/// spatially-offset frames is a refinement. Completion is announced via [`WorldTransferred`].
+/// e.g. a docked airlock). Full environment-position-preserving pose decomposition for
+/// spatially-offset frames is a refinement. Completion is announced via [`EnvironmentTransferred`].
 ///
 /// # Example
 ///
 /// ```ignore
 /// // Transfer player from ship interior to planet surface
-/// commands.trigger(TransferToWorld {
+/// commands.trigger(TransferToEnvironment {
 ///     entity: player_entity,
-///     world: planet_world,
+///     environment: planet_world,
 /// });
 /// ```
 #[derive(EntityEvent, Clone, Copy, Debug)]
-pub struct TransferToWorld {
+pub struct TransferToEnvironment {
     /// The entity to transfer.
     pub entity: Entity,
-    /// The [`PhysicsWorld`] entity to transfer to.
+    /// The [`PhysicsEnvironment`] entity to transfer to.
     pub world: Entity,
 }
 
-/// Fired by [`on_transfer_to_world`] **after** a [`TransferToWorld`] completes — the
+/// Fired by [`on_transfer_to_environment`] **after** a [`TransferToEnvironment`] completes — the
 /// notification that velocity reframing and any external rebase bind to (e.g. solari's
 /// rotational rebase of the previous view-projection when the camera crosses frames).
 ///
-/// Carries **both** frame anchors explicitly, so observers never race the world-cache
+/// Carries **both** frame anchors explicitly, so observers never race the environment-cache
 /// update inside the transfer handler. Read each anchor's `LinearVelocity`/`AngularVelocity`
 /// (and, for a renderer, its world rotation) off the `from`/`to` entities to compute the
 /// reframe — the kinematic state lives on the frames, keeping this event pure routing.
 #[derive(EntityEvent, Clone, Copy, Debug)]
-pub struct WorldTransferred {
+pub struct EnvironmentTransferred {
     /// The entity that was transferred.
     pub entity: Entity,
-    /// The [`PhysicsWorld`] it came from.
+    /// The [`PhysicsEnvironment`] it came from.
     pub from: Entity,
-    /// The [`PhysicsWorld`] it now belongs to.
+    /// The [`PhysicsEnvironment`] it now belongs to.
     pub to: Entity,
 }
 
-/// Handles [`TransferToWorld`] events.
+/// Handles [`TransferToEnvironment`] events.
 ///
 /// Directly manipulates physics state via queries — no deferred SolverBody
-/// remove/re-add, so no hook ordering issues and no exclusive world lock.
+/// remove/re-add, so no hook ordering issues and no exclusive environment lock.
 ///
-/// 1. Removes collider proxy from old world's [`ColliderTrees`]
-/// 2. Unlinks body from old world's [`PhysicsIslands`]
+/// 1. Removes collider proxy from old environment's [`ColliderTrees`]
+/// 2. Unlinks body from old environment's [`PhysicsIslands`]
 /// 3. Re-parents entity via deferred [`ChildOf`] insert
-/// 4. Creates a new island in the target world's [`PhysicsIslands`]
+/// 4. Creates a new island in the target environment's [`PhysicsIslands`]
 /// 5. Re-registers collider proxy via deferred [`ColliderOf`] re-insert
-/// 6. Wakes sleeping islands in the target world
+/// 6. Wakes sleeping islands in the target environment
 #[derive(SystemParam)]
 #[allow(clippy::type_complexity)]
 struct TransferParams<'w, 's> {
@@ -268,10 +277,10 @@ struct TransferParams<'w, 's> {
     bodies: Query<'w, 's, (&'static RigidBody, Has<RigidBodyDisabled>)>,
     body_islands: Query<'w, 's, &'static mut BodyIslandNode>,
     sleep_timers: Query<'w, 's, &'static mut crate::dynamics::rigid_body::sleeping::SleepTimer>,
-    world_cache: Query<'w, 's, &'static mut PhysicsWorldEntity>,
+    world_cache: Query<'w, 's, &'static mut PhysicsEnvironmentEntity>,
     parents: Query<'w, 's, &'static ChildOf>,
-    physics_worlds: Query<'w, 's, (), With<PhysicsWorld>>,
-    main_world: Res<'w, MainPhysicsWorldEntity>,
+    physics_worlds: Query<'w, 's, (), With<PhysicsEnvironment>>,
+    main_world: Res<'w, MainPhysicsEnvironmentEntity>,
     world_state: Query<
         'w,
         's,
@@ -281,24 +290,31 @@ struct TransferParams<'w, 's> {
             &'static mut PhysicsIslands,
             &'static mut AwakeIslandBitVec,
         ),
-        With<PhysicsWorld>,
+        With<PhysicsEnvironment>,
     >,
     // Frame anchors' own motion (kinematic movers like a flying ship); static frames
-    // simply lack these. `With`/`Without<PhysicsWorld>` keeps the two velocity queries
+    // simply lack these. `With`/`Without<PhysicsEnvironment>` keeps the two velocity queries
     // archetype-disjoint, so the mutable body query doesn't conflict with the frame read.
     frame_vels: Query<
         'w,
         's,
-        (Option<&'static LinearVelocity>, Option<&'static AngularVelocity>),
-        With<PhysicsWorld>,
+        (
+            Option<&'static LinearVelocity>,
+            Option<&'static AngularVelocity>,
+        ),
+        With<PhysicsEnvironment>,
     >,
-    body_vels:
-        Query<'w, 's, (&'static mut LinearVelocity, &'static mut AngularVelocity), Without<PhysicsWorld>>,
+    body_vels: Query<
+        'w,
+        's,
+        (&'static mut LinearVelocity, &'static mut AngularVelocity),
+        Without<PhysicsEnvironment>,
+    >,
     commands: Commands<'w, 's>,
 }
 
 impl TransferParams<'_, '_> {
-    // Cached world, falling back to a hierarchy walk.
+    // Cached environment, falling back to a hierarchy walk.
     fn current_world(&self, entity: Entity) -> Entity {
         if let Ok(cached) = self.world_cache.get(entity) {
             return cached.0;
@@ -316,26 +332,32 @@ impl TransferParams<'_, '_> {
     }
 }
 
-fn on_transfer_to_world(trigger: On<TransferToWorld>, mut p: TransferParams) {
+fn on_transfer_to_environment(trigger: On<TransferToEnvironment>, mut p: TransferParams) {
     let entity = trigger.event_target();
     let from = p.current_world(entity);
     transfer(&mut p, entity, from, trigger.event().world, true);
 }
 
-/// Moves an entity's physics state between worlds after its hierarchy already changed.
+/// Moves an entity's physics state between environments after its hierarchy already changed.
 #[derive(EntityEvent, Clone, Copy, Debug)]
-pub(crate) struct RehomeToWorld {
+pub(crate) struct RehomeToEnvironment {
     entity: Entity,
     from: Entity,
     to: Entity,
 }
 
-fn on_rehome_to_world(trigger: On<RehomeToWorld>, mut p: TransferParams) {
+fn on_rehome_to_environment(trigger: On<RehomeToEnvironment>, mut p: TransferParams) {
     let event = trigger.event();
     transfer(&mut p, event.entity, event.from, event.to, false);
 }
 
-fn transfer(p: &mut TransferParams, entity: Entity, old_world: Entity, target_world: Entity, reparent: bool) {
+fn transfer(
+    p: &mut TransferParams,
+    entity: Entity,
+    old_world: Entity,
+    target_world: Entity,
+    reparent: bool,
+) {
     let TransferParams {
         collider_keys,
         bodies,
@@ -353,12 +375,12 @@ fn transfer(p: &mut TransferParams, entity: Entity, old_world: Entity, target_wo
         return; // Already in the target world.
     }
 
-    // Update the cached world assignment immediately.
+    // Update the cached environment assignment immediately.
     if let Ok(mut cached) = world_cache.get_mut(entity) {
         cached.0 = target_world;
     }
 
-    // --- 1. Remove collider proxy from old world's tree ---
+    // --- 1. Remove collider proxy from old environment's tree ---
     // Collect child collider entities to avoid borrow conflicts.
     let child_colliders_for_remove: Vec<Entity> = collider_keys
         .get(entity)
@@ -371,7 +393,7 @@ fn transfer(p: &mut TransferParams, entity: Entity, old_world: Entity, target_wo
         remove_proxy_from_world(collider, old_world, collider_keys, world_state);
     }
 
-    // --- 2. Unlink body from old world's island ---
+    // --- 2. Unlink body from old environment's island ---
     let mut old_island_id = IslandId::PLACEHOLDER;
     let mut old_island_survived = false;
 
@@ -392,7 +414,7 @@ fn transfer(p: &mut TransferParams, entity: Entity, old_world: Entity, target_wo
             }
         }
 
-        // Update the old world's island.
+        // Update the old environment's island.
         if let Ok((_, _, mut old_islands, _)) = world_state.get_mut(old_world) {
             if let Some(island) = old_islands.get_mut(old_island_id) {
                 island.body_count = island.body_count.saturating_sub(1);
@@ -410,7 +432,7 @@ fn transfer(p: &mut TransferParams, entity: Entity, old_world: Entity, target_wo
             }
         }
 
-        // --- 4. Create a new island in the target world and update the body's node ---
+        // --- 4. Create a new island in the target environment and update the body's node ---
         let mut new_island_id = IslandId::PLACEHOLDER;
         if let Ok((_, _, mut new_islands, mut awake_bits)) = world_state.get_mut(target_world) {
             new_island_id = new_islands.create_island_with(|island| {
@@ -428,12 +450,12 @@ fn transfer(p: &mut TransferParams, entity: Entity, old_world: Entity, target_wo
         }
     }
 
-    // --- 3. Re-parent to new world (deferred — only affects hierarchy lookup) ---
+    // --- 3. Re-parent to new environment (deferred — only affects hierarchy lookup) ---
     if reparent {
         commands.entity(entity).insert(ChildOf(target_world));
     }
 
-    // --- 5. Add collider proxy to new world's tree (direct) ---
+    // --- 5. Add collider proxy to new environment's tree (direct) ---
     // Collect child collider entities first to avoid borrow conflicts.
     let child_colliders: Vec<Entity> = collider_keys
         .get(entity)
@@ -462,12 +484,16 @@ fn transfer(p: &mut TransferParams, entity: Entity, old_world: Entity, target_wo
         });
     }
 
-    // Wake all sleeping islands in the destination world.
+    // Wake all sleeping islands in the destination environment.
     let new_to_wake: Vec<_> = world_state
         .get(target_world)
         .ok()
         .map(|(_, _, islands, _)| {
-            islands.iter().filter(|i| i.is_sleeping).map(|i| i.id).collect()
+            islands
+                .iter()
+                .filter(|i| i.is_sleeping)
+                .map(|i| i.id)
+                .collect()
         })
         .unwrap_or_default();
     if !new_to_wake.is_empty() {
@@ -485,10 +511,20 @@ fn transfer(p: &mut TransferParams, entity: Entity, old_world: Entity, target_wo
     //
     // NOTE: this is the translational (+ spin-about-anchor) reframe. The ω×r lever-arm
     // between rotating *offset* frames is a refinement for when such frames are used.
-    let frame_lin =
-        |w: Entity| frame_vels.get(w).ok().and_then(|(l, _)| l).map_or(LinearVelocity::default().0, |l| l.0);
-    let frame_ang =
-        |w: Entity| frame_vels.get(w).ok().and_then(|(_, a)| a).map_or(AngularVelocity::default().0, |a| a.0);
+    let frame_lin = |w: Entity| {
+        frame_vels
+            .get(w)
+            .ok()
+            .and_then(|(l, _)| l)
+            .map_or(LinearVelocity::default().0, |l| l.0)
+    };
+    let frame_ang = |w: Entity| {
+        frame_vels
+            .get(w)
+            .ok()
+            .and_then(|(_, a)| a)
+            .map_or(AngularVelocity::default().0, |a| a.0)
+    };
     if reparent && let Ok((mut lin, mut ang)) = body_vels.get_mut(entity) {
         lin.0 += frame_lin(old_world) - frame_lin(target_world);
         ang.0 += frame_ang(old_world) - frame_ang(target_world);
@@ -496,15 +532,15 @@ fn transfer(p: &mut TransferParams, entity: Entity, old_world: Entity, target_wo
 
     // --- 8. Notify observers (avian-side + renderer) of the completed handoff ---
     // Both frames explicit so consumers (e.g. solari's rotational rebase of the previous
-    // view-projection) never race the world-cache update above.
-    commands.trigger(WorldTransferred {
+    // view-projection) never race the environment-cache update above.
+    commands.trigger(EnvironmentTransferred {
         entity,
         from: old_world,
         to: target_world,
     });
 }
 
-/// Removes an entity's collider proxy from a world's [`ColliderTrees`].
+/// Removes an entity's collider proxy from an environment's [`ColliderTrees`].
 #[allow(clippy::type_complexity)]
 fn remove_proxy_from_world(
     entity: Entity,
@@ -520,8 +556,13 @@ fn remove_proxy_from_world(
         Option<&ActiveCollisionHooks>,
     )>,
     world_state: &mut Query<
-        (&mut ColliderTrees, &mut MovedProxies, &mut PhysicsIslands, &mut AwakeIslandBitVec),
-        With<PhysicsWorld>,
+        (
+            &mut ColliderTrees,
+            &mut MovedProxies,
+            &mut PhysicsIslands,
+            &mut AwakeIslandBitVec,
+        ),
+        With<PhysicsEnvironment>,
     >,
 ) {
     let Ok((proxy_key, ..)) = collider_keys.get(entity) else {
@@ -538,7 +579,7 @@ fn remove_proxy_from_world(
     moved_proxies.remove(proxy_key);
 }
 
-/// Adds an entity's collider proxy to a world's [`ColliderTrees`].
+/// Adds an entity's collider proxy to an environment's [`ColliderTrees`].
 #[allow(clippy::type_complexity)]
 fn add_proxy_to_world(
     entity: Entity,
@@ -555,8 +596,13 @@ fn add_proxy_to_world(
     )>,
     bodies: &Query<(&RigidBody, Has<RigidBodyDisabled>)>,
     world_state: &mut Query<
-        (&mut ColliderTrees, &mut MovedProxies, &mut PhysicsIslands, &mut AwakeIslandBitVec),
-        With<PhysicsWorld>,
+        (
+            &mut ColliderTrees,
+            &mut MovedProxies,
+            &mut PhysicsIslands,
+            &mut AwakeIslandBitVec,
+        ),
+        With<PhysicsEnvironment>,
     >,
 ) {
     let Ok((
@@ -616,21 +662,21 @@ fn queue_rehome(entity: Entity, mut pending: ResMut<PendingRehome>, mut commands
     pending.0.push(entity);
 }
 
-// Bodies and standalone colliders under a reparented entity follow it to its new world.
+// Bodies and standalone colliders under a reparented entity follow it to its new environment.
 fn drain_rehome(world: &mut World) {
     let roots = core::mem::take(&mut world.resource_mut::<PendingRehome>().0);
-    let mut worlds = world.query_filtered::<(Entity, &ColliderTrees), With<PhysicsWorld>>();
-    let main = world.resource::<MainPhysicsWorldEntity>().0;
+    let mut worlds = world.query_filtered::<(Entity, &ColliderTrees), With<PhysicsEnvironment>>();
+    let main = world.resource::<MainPhysicsEnvironmentEntity>().0;
     worlds.update_archetypes(world);
     let mut seen = bevy::ecs::entity::EntityHashSet::default();
     let mut moves = Vec::new();
     for root in roots {
-        if world.get_entity(root).is_err() || world.get::<PhysicsWorld>(root).is_some() {
+        if world.get_entity(root).is_err() || world.get::<PhysicsEnvironment>(root).is_some() {
             continue;
         }
         let mut stack = vec![(root, hierarchy_world(world, root, main))];
         while let Some((entity, target)) = stack.pop() {
-            if !seen.insert(entity) || world.get::<PhysicsWorld>(entity).is_some() {
+            if !seen.insert(entity) || world.get::<PhysicsEnvironment>(entity).is_some() {
                 continue;
             }
             if let Some(from) = physics_home(world, &mut worlds, entity)
@@ -644,14 +690,14 @@ fn drain_rehome(world: &mut World) {
         }
     }
     for (entity, from, to) in moves {
-        world.trigger(RehomeToWorld { entity, from, to });
+        world.trigger(RehomeToEnvironment { entity, from, to });
     }
 }
 
 fn hierarchy_world(world: &World, entity: Entity, main: Entity) -> Entity {
     let mut current = entity;
     loop {
-        if world.get::<PhysicsWorld>(current).is_some() {
+        if world.get::<PhysicsEnvironment>(current).is_some() {
             return current;
         }
         match world.get::<ChildOf>(current) {
@@ -661,48 +707,79 @@ fn hierarchy_world(world: &World, entity: Entity, main: Entity) -> Entity {
     }
 }
 
-// The world an entity's physics state lives in: a body's cache, or the tree holding a
+// The environment an entity's physics state lives in: a body's cache, or the tree holding a
 // standalone collider's proxy. Colliders attached to another body move with it.
 fn physics_home(
     world: &World,
-    worlds: &mut QueryState<(Entity, &ColliderTrees), With<PhysicsWorld>>,
+    worlds: &mut QueryState<(Entity, &ColliderTrees), With<PhysicsEnvironment>>,
     entity: Entity,
 ) -> Option<Entity> {
     if world.get::<BodyIslandNode>(entity).is_some() {
-        return world.get::<PhysicsWorldEntity>(entity).map(|cached| cached.0);
+        return world
+            .get::<PhysicsEnvironmentEntity>(entity)
+            .map(|cached| cached.0);
     }
     let key = *world.get::<ColliderTreeProxyKey>(entity)?;
     if key == ColliderTreeProxyKey::PLACEHOLDER
-        || world.get::<ColliderOf>(entity).is_some_and(|of| of.body != entity)
+        || world
+            .get::<ColliderOf>(entity)
+            .is_some_and(|of| of.body != entity)
     {
         return None;
     }
     worlds
         .iter_manual(world)
-        .find(|(_, trees)| trees.get_proxy(key).is_some_and(|proxy| proxy.collider == entity))
+        .find(|(_, trees)| {
+            trees
+                .get_proxy(key)
+                .is_some_and(|proxy| proxy.collider == entity)
+        })
         .map(|(world_entity, _)| world_entity)
 }
 
-/// Plugin that spawns the [`MainPhysicsWorld`] entity and registers transfer handling.
-pub struct PhysicsWorldPlugin;
+/// Plugin that spawns the [`MainPhysicsEnvironment`] entity and registers transfer handling.
+pub struct PhysicsEnvironmentPlugin;
 
-impl Plugin for PhysicsWorldPlugin {
-    // Spawn the main world in `build`: tests and apps expect `MainPhysicsWorldEntity`
+/// An environment and the settings it carries, for reflection: scenes save and editors show them.
+pub fn register_environment_types(app: &mut App) {
+    app.register_type::<PhysicsEnvironment>()
+        .register_type::<MainPhysicsEnvironment>()
+        .register_type::<Gravity>()
+        .register_type::<PhysicsLengthUnit>()
+        .register_type::<SolverConfig>()
+        .register_type::<ContactSoftnessCoefficients>()
+        .register_type::<NarrowPhaseConfig>()
+        .register_type::<DefaultFriction>()
+        .register_type::<DefaultRestitution>()
+        .register_type::<TimeToSleep>();
+}
+
+impl Plugin for PhysicsEnvironmentPlugin {
+    // Spawn the main environment in `build`: tests and apps expect `MainPhysicsEnvironmentEntity`
     // right after the plugins are added. (The solari branch spawned in `finish` for its
-    // late `register_required_components` on PhysicsWorld; nothing here needs that.)
+    // late `register_required_components` on PhysicsEnvironment; nothing here needs that.)
     fn build(&self, app: &mut App) {
+        register_environment_types(app);
         // Register the transfer observer.
-        app.add_observer(on_transfer_to_world)
-            .add_observer(on_rehome_to_world)
+        app.add_observer(on_transfer_to_environment)
+            .add_observer(on_rehome_to_environment)
             .init_resource::<PendingRehome>()
-            .add_observer(|trigger: On<Insert<ChildOf>>, pending: ResMut<PendingRehome>, commands: Commands| {
-                queue_rehome(trigger.entity, pending, commands);
-            })
-            .add_observer(|trigger: On<Remove<ChildOf>>, pending: ResMut<PendingRehome>, commands: Commands| {
-                queue_rehome(trigger.entity, pending, commands);
-            });
+            .add_observer(
+                |trigger: On<Insert<ChildOf>>,
+                 pending: ResMut<PendingRehome>,
+                 commands: Commands| {
+                    queue_rehome(trigger.entity, pending, commands);
+                },
+            )
+            .add_observer(
+                |trigger: On<Remove<ChildOf>>,
+                 pending: ResMut<PendingRehome>,
+                 commands: Commands| {
+                    queue_rehome(trigger.entity, pending, commands);
+                },
+            );
 
-        let entity = app.world_mut().spawn(MainPhysicsWorld).id();
-        app.insert_resource(MainPhysicsWorldEntity(entity));
+        let entity = app.world_mut().spawn(MainPhysicsEnvironment).id();
+        app.insert_resource(MainPhysicsEnvironmentEntity(entity));
     }
 }

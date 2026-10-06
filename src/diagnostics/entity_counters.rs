@@ -1,6 +1,9 @@
 use bevy::{diagnostic::DiagnosticPath, prelude::*};
 
-use crate::{ColliderMarker, MainPhysicsWorldEntity, PhysicsSchedule, PhysicsStepSystems, RigidBody, dynamics::joints::*};
+use crate::{
+    ColliderMarker, MainPhysicsEnvironmentEntity, PhysicsSchedule, PhysicsStepSystems, RigidBody,
+    dynamics::joints::*,
+};
 
 use super::{AppDiagnosticsExt, PhysicsDiagnostics, impl_diagnostic_paths};
 
@@ -66,8 +69,8 @@ fn diagnostic_entity_counts(
     distance_joint_query: Query<&DistanceJoint>,
     revolute_joint_query: Query<&RevoluteJoint>,
     #[cfg(feature = "3d")] spherical_joint_query: Query<&SphericalJoint>,
-    mut worlds: Query<&mut PhysicsEntityDiagnostics, With<crate::world::PhysicsWorld>>,
-    main_world: Res<MainPhysicsWorldEntity>,
+    mut worlds: Query<&mut PhysicsEntityDiagnostics, With<crate::environment::PhysicsEnvironment>>,
+    main_world: Res<MainPhysicsEnvironmentEntity>,
 ) {
     let Ok(mut diagnostics) = worlds.get_mut(main_world.0) else {
         return;

@@ -151,7 +151,7 @@ pub type IntegrationSet = IntegrationSystems;
 #[derive(Reflect, Component, Debug)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, Component)]
+#[reflect(Debug, Component, Default)]
 pub struct Gravity(pub Vector);
 
 impl Default for Gravity {
@@ -266,8 +266,8 @@ pub fn pre_process_velocity_increments(
         Option<&GravityScale>,
         Option<&LockedAxes>,
     )>,
-    world_lookup: PhysicsWorldLookup,
-    mut worlds: Query<(Entity, &Gravity, &mut SolverDiagnostics), With<PhysicsWorld>>,
+    world_lookup: PhysicsEnvironmentLookup,
+    mut worlds: Query<(Entity, &Gravity, &mut SolverDiagnostics), With<PhysicsEnvironment>>,
     time: Res<Time<Substeps>>,
 ) {
     let delta_secs = time.delta_secs();
@@ -280,7 +280,7 @@ pub fn pre_process_velocity_increments(
         for (entity, rb, mut integration, lin_damping, ang_damping, gravity_scale, locked_axes) in
             bodies.iter_mut()
         {
-            if world_lookup.world_entity_of(entity) != world_entity || !rb.is_dynamic() {
+            if world_lookup.environment_of(entity) != world_entity || !rb.is_dynamic() {
                 continue;
             }
 
@@ -317,7 +317,7 @@ pub fn pre_process_velocity_increments(
 /// Clears the velocity increments of bodies after the substepping loop.
 fn clear_velocity_increments(
     mut bodies: Query<&mut VelocityIntegrationData, With<SolverBodyIndex>>,
-    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsEnvironment>>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -351,7 +351,7 @@ pub fn integrate_velocities(
         VelocityIntegrationQuery,
         (RigidBodyActiveFilter, Without<CustomVelocityIntegration>),
     >,
-    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsEnvironment>>,
     #[cfg(feature = "3d")] time: Res<Time>,
 ) {
     let start = crate::utils::Instant::now();
@@ -484,7 +484,7 @@ fn clamp_velocities(
         Query<(&SolverBodyIndex, &MaxLinearSpeed)>,
         Query<(&SolverBodyIndex, &MaxAngularSpeed)>,
     )>,
-    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsEnvironment>>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -527,7 +527,7 @@ fn clamp_velocities(
 pub fn integrate_positions(
     mut bodies: ResMut<SolverBodies>,
     time: Res<Time>,
-    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsEnvironment>>,
 ) {
     let start = crate::utils::Instant::now();
 

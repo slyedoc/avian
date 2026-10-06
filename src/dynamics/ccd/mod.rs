@@ -600,9 +600,9 @@ fn solve_continuous(
             &NarrowPhaseConfig,
             &mut SolverDiagnostics,
         ),
-        With<PhysicsWorld>,
+        With<PhysicsEnvironment>,
     >,
-    main_world: Res<MainPhysicsWorldEntity>,
+    main_world: Res<MainPhysicsEnvironmentEntity>,
 ) {
     let Ok((trees, mut contact_graph, _narrow_phase_config, mut diagnostics)) =
         worlds.get_mut(main_world.0)

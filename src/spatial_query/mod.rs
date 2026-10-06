@@ -399,7 +399,7 @@ fn update_shape_caster_positions(
 fn raycast(
     mut rays: Query<(Entity, &mut RayCaster, &mut RayHits)>,
     spatial_query: SpatialQuery,
-    mut worlds: Query<&mut SpatialQueryDiagnostics, With<PhysicsWorld>>,
+    mut worlds: Query<&mut SpatialQueryDiagnostics, With<PhysicsEnvironment>>,
 ) {
     let start = crate::utils::Instant::now();
 
@@ -421,7 +421,7 @@ fn raycast(
 fn shapecast(
     mut shape_casters: Query<(Entity, &mut ShapeCaster, &mut ShapeHits)>,
     spatial_query: SpatialQuery,
-    mut worlds: Query<&mut SpatialQueryDiagnostics, With<PhysicsWorld>>,
+    mut worlds: Query<&mut SpatialQueryDiagnostics, With<PhysicsEnvironment>>,
 ) {
     let start = crate::utils::Instant::now();
 

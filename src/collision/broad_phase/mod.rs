@@ -173,7 +173,7 @@ pub struct BroadPhaseCorePlugin;
 
 impl Plugin for BroadPhaseCorePlugin {
     fn build(&self, app: &mut App) {
-        // ContactGraph and JointGraph are on the PhysicsWorld entity.
+        // ContactGraph and JointGraph are on the PhysicsEnvironment entity.
 
         app.configure_sets(
             PhysicsSchedule,

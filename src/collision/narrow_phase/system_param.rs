@@ -75,14 +75,14 @@ pub struct NarrowPhase<'w, 's, C: AnyCollider> {
     thread_locals: ResMut<'w, NarrowPhaseThreadLocals>,
 }
 
-/// The per-world narrow phase state, fetched from each [`PhysicsWorld`] entity and passed
+/// The per-world narrow phase state, fetched from each [`PhysicsEnvironment`] entity and passed
 /// into [`NarrowPhase::update`] -- the narrow phase runs once per world.
 ///
-/// [`PhysicsWorld`]: crate::world::PhysicsWorld
+/// [`PhysicsEnvironment`]: crate::environment::PhysicsEnvironment
 #[derive(bevy::ecs::query::QueryData)]
 #[query_data(mutable)]
 #[expect(missing_docs)]
-pub struct NarrowPhaseWorldQuery {
+pub struct NarrowPhaseEnvironmentQuery {
     pub entity: Entity,
     pub contact_graph: &'static mut ContactGraph,
     pub contact_status_changes: &'static mut ContactStatusChangeQueue,
@@ -168,7 +168,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
     /// - Records [`ContactStatusChange`]s into [`ContactStatusChangeQueue`] for the solver to apply.
     pub fn update<H: CollisionHooks>(
         &mut self,
-        w: &mut NarrowPhaseWorldQueryItem<'_, '_>,
+        w: &mut NarrowPhaseEnvironmentQueryItem<'_, '_>,
         collision_started_writer: &mut MessageWriter<CollisionStart>,
         collision_ended_writer: &mut MessageWriter<CollisionEnd>,
         delta_secs: f32,
@@ -195,7 +195,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                 let contact_id = ContactId(i as u32 * 64 + trailing_zeros);
 
                 let (contact_edge, contact_pair) = w
-                        .contact_graph
+                    .contact_graph
                     .get_mut_by_id(contact_id)
                     .unwrap_or_else(|| panic!("Contact pair not found for {contact_id:?}"));
 
@@ -341,14 +341,13 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
                     contact_pair.manifold_count_change = 0;
 
                     if let (Some(body1), Some(body2)) = (contact_pair.body1, contact_pair.body2) {
-                        w.contact_status_changes.push(
-                            ContactStatusChange::ManifoldCountChanged {
+                        w.contact_status_changes
+                            .push(ContactStatusChange::ManifoldCountChanged {
                                 contact: contact_id,
                                 body1,
                                 body2,
                                 delta,
-                            },
-                        );
+                            });
                     }
                 }
 
@@ -395,7 +394,7 @@ impl<C: AnyCollider> NarrowPhase<'_, '_, C> {
     /// The order of contact pairs is preserved.
     fn update_contacts<H: CollisionHooks>(
         &mut self,
-        w: &mut NarrowPhaseWorldQueryItem<'_, '_>,
+        w: &mut NarrowPhaseEnvironmentQueryItem<'_, '_>,
         delta_secs: f32,
         hooks: &SystemParamItem<H>,
         collider_context: &SystemParamItem<C::Context>,

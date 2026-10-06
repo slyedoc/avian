@@ -21,7 +21,8 @@ use bevy::{
     text::FontSourceTemplate,
     ui::Checked,
     ui_widgets::{
-        RadioButton, RadioGroup, SliderPrecision, SliderStep, SliderValue, ValueChange, slider_self_update,
+        RadioButton, RadioGroup, SliderPrecision, SliderStep, SliderValue, ValueChange,
+        slider_self_update,
     },
 };
 use examples_common_3d::ExampleCommonPlugin;

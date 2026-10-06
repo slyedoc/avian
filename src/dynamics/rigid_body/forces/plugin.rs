@@ -214,7 +214,7 @@ fn apply_local_acceleration(
         (&SolverBodyIndex, &AccumulatedLocalAcceleration, &Rotation),
         Without<CustomVelocityIntegration>,
     >,
-    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsEnvironment>>,
     time: Res<Time<Substeps>>,
 ) {
     let start = crate::utils::Instant::now();

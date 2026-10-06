@@ -21,7 +21,7 @@ pub(crate) mod system_param;
 #[cfg(feature = "parallel")]
 use system_param::NarrowPhaseThreadLocals;
 pub use system_param::{
-    ContactStatusChange, ContactStatusChangeQueue, NarrowPhase, NarrowPhaseWorldQuery,
+    ContactStatusChange, ContactStatusChangeQueue, NarrowPhase, NarrowPhaseEnvironmentQuery,
 };
 
 use core::marker::PhantomData;
@@ -86,7 +86,7 @@ where
     fn build(&self, app: &mut App) {
         let already_initialized = app.world().is_resource_added::<NarrowPhaseInitialized>();
 
-        // Per-world graph/config/queue state lives on the PhysicsWorld entity.
+        // Per-world graph/config/queue state lives on the PhysicsEnvironment entity.
 
         #[cfg(feature = "parallel")]
         app.init_resource::<NarrowPhaseThreadLocals>();
@@ -171,7 +171,7 @@ pub struct CollisionEventSystems;
 #[derive(Component, Reflect, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, Component, PartialEq)]
+#[reflect(Debug, Component, Default, PartialEq)]
 pub struct NarrowPhaseConfig {
     /// A small, positive contact tolerance to help ensure that contacts are not missed
     /// due to numerical issues or solver jitter for objects that are in continuous
@@ -243,8 +243,11 @@ pub type NarrowPhaseSet = NarrowPhaseSystems;
 
 fn update_narrow_phase<C: AnyCollider, H: CollisionHooks + 'static>(
     mut narrow_phase: NarrowPhase<C>,
-    mut worlds: Query<NarrowPhaseWorldQuery, With<crate::world::PhysicsWorld>>,
-    mut world_diagnostics: Query<&mut CollisionDiagnostics, With<crate::world::PhysicsWorld>>,
+    mut worlds: Query<NarrowPhaseEnvironmentQuery, With<crate::environment::PhysicsEnvironment>>,
+    mut world_diagnostics: Query<
+        &mut CollisionDiagnostics,
+        With<crate::environment::PhysicsEnvironment>,
+    >,
     mut collision_started_writer: MessageWriter<CollisionStart>,
     mut collision_ended_writer: MessageWriter<CollisionEnd>,
     time: Res<Time>,
@@ -438,15 +441,15 @@ fn remove_body_on<E: EventPattern<Event: EntityEvent>>(
     mut message_writer: MessageWriter<CollisionEnd>,
     mut worlds: Query<
         (&mut ContactGraph, &mut ContactStatusChangeQueue),
-        With<crate::world::PhysicsWorld>,
+        With<crate::environment::PhysicsEnvironment>,
     >,
-    world_lookup: crate::world::PhysicsWorldLookup,
+    world_lookup: crate::environment::PhysicsEnvironmentLookup,
 ) {
     let Ok(colliders) = body_collider_query.get(trigger.event_target()) else {
         return;
     };
     let Ok((mut contact_graph, mut contact_status_changes)) =
-        worlds.get_mut(world_lookup.world_entity_of(trigger.event_target()))
+        worlds.get_mut(world_lookup.environment_of(trigger.event_target()))
     else {
         return;
     };
@@ -471,15 +474,15 @@ fn remove_collider_on<E: EventPattern<Event: EntityEvent>>(
     trigger: On<E>,
     mut worlds: Query<
         (&mut ContactGraph, &mut ContactStatusChangeQueue),
-        With<crate::world::PhysicsWorld>,
+        With<crate::environment::PhysicsEnvironment>,
     >,
-    world_lookup: crate::world::PhysicsWorldLookup,
+    world_lookup: crate::environment::PhysicsEnvironmentLookup,
     mut query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {
     let entity = trigger.event_target();
     let Ok((mut contact_graph, mut contact_status_changes)) =
-        worlds.get_mut(world_lookup.world_entity_of(entity))
+        worlds.get_mut(world_lookup.environment_of(entity))
     else {
         return;
     };
@@ -501,9 +504,9 @@ fn on_body_remove_rigid_body_disabled(
     body_collider_query: Query<&RigidBodyColliders>,
     mut worlds: Query<
         (&mut ContactGraph, &mut ContactStatusChangeQueue),
-        With<crate::world::PhysicsWorld>,
+        With<crate::environment::PhysicsEnvironment>,
     >,
-    world_lookup: crate::world::PhysicsWorldLookup,
+    world_lookup: crate::environment::PhysicsEnvironmentLookup,
     mut colliding_entities_query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {
@@ -511,7 +514,7 @@ fn on_body_remove_rigid_body_disabled(
         return;
     };
     let Ok((mut contact_graph, mut contact_status_changes)) =
-        worlds.get_mut(world_lookup.world_entity_of(trigger.entity))
+        worlds.get_mut(world_lookup.environment_of(trigger.entity))
     else {
         return;
     };
@@ -534,9 +537,9 @@ fn on_disable_body(
     body_collider_query: Query<&RigidBodyColliders, Allow<Disabled>>,
     mut worlds: Query<
         (&mut ContactGraph, &mut ContactStatusChangeQueue),
-        With<crate::world::PhysicsWorld>,
+        With<crate::environment::PhysicsEnvironment>,
     >,
-    world_lookup: crate::world::PhysicsWorldLookup,
+    world_lookup: crate::environment::PhysicsEnvironmentLookup,
     mut colliding_entities_query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {
@@ -544,7 +547,7 @@ fn on_disable_body(
         return;
     };
     let Ok((mut contact_graph, mut contact_status_changes)) =
-        worlds.get_mut(world_lookup.world_entity_of(trigger.entity))
+        worlds.get_mut(world_lookup.environment_of(trigger.entity))
     else {
         return;
     };
@@ -569,14 +572,14 @@ fn on_add_sensor(
     trigger: On<Add<Sensor>>,
     mut worlds: Query<
         (&mut ContactGraph, &mut ContactStatusChangeQueue),
-        With<crate::world::PhysicsWorld>,
+        With<crate::environment::PhysicsEnvironment>,
     >,
-    world_lookup: crate::world::PhysicsWorldLookup,
+    world_lookup: crate::environment::PhysicsEnvironmentLookup,
     mut colliding_entities_query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {
     let Ok((mut contact_graph, mut contact_status_changes)) =
-        worlds.get_mut(world_lookup.world_entity_of(trigger.entity))
+        worlds.get_mut(world_lookup.environment_of(trigger.entity))
     else {
         return;
     };
@@ -595,14 +598,14 @@ fn on_remove_sensor(
     trigger: On<Remove<Sensor>>,
     mut worlds: Query<
         (&mut ContactGraph, &mut ContactStatusChangeQueue),
-        With<crate::world::PhysicsWorld>,
+        With<crate::environment::PhysicsEnvironment>,
     >,
-    world_lookup: crate::world::PhysicsWorldLookup,
+    world_lookup: crate::environment::PhysicsEnvironmentLookup,
     mut colliding_entities_query: Query<&mut CollidingEntities, Allow<Disabled>>,
     mut message_writer: MessageWriter<CollisionEnd>,
 ) {
     let Ok((mut contact_graph, mut contact_status_changes)) =
-        worlds.get_mut(world_lookup.world_entity_of(trigger.entity))
+        worlds.get_mut(world_lookup.environment_of(trigger.entity))
     else {
         return;
     };

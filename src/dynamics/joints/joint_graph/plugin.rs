@@ -8,8 +8,8 @@ use crate::{
     data_structures::pair_key::PairKey,
     dynamics::joints::EntityConstraint,
     prelude::{
-        ContactGraph, ContactStatusChange, JointCollisionDisabled,
-        JointDisabled, PhysicsSchedule, PhysicsStepSystems, RigidBodyColliders,
+        ContactGraph, ContactStatusChange, JointCollisionDisabled, JointDisabled, PhysicsSchedule,
+        PhysicsStepSystems, RigidBodyColliders,
     },
 };
 use bevy::{
@@ -39,7 +39,7 @@ impl<T: Component + EntityConstraint<2>> Plugin for JointGraphPlugin<T> {
         let already_initialized = app
             .world()
             .is_resource_added::<JointGraphPluginInitialized>();
-        // JointGraph lives on the PhysicsWorld entity.
+        // JointGraph lives on the PhysicsEnvironment entity.
         app.add_message::<JointGraphChange>();
         app.init_resource::<JointGraphPluginInitialized>();
 
@@ -70,11 +70,15 @@ impl<T: Component + EntityConstraint<2>> Plugin for JointGraphPlugin<T> {
 
         // Add the joint back to the joint graph when `Disabled` is removed.
         app.add_observer(
-            add_joint_to_graph::<T, Remove<Disabled>, (
+            add_joint_to_graph::<
+                T,
+                Remove<Disabled>,
+                (
                     With<JointComponentId>,
                     Or<(With<Disabled>, Without<Disabled>)>,
                     Without<JointDisabled>,
-                )>,
+                ),
+            >,
         );
 
         // Add the joint back to the joint graph when `JointDisabled` is removed.
@@ -95,13 +99,13 @@ impl<T: Component + EntityConstraint<2>> Plugin for JointGraphPlugin<T> {
 /// which may need to link and unlink joints from simulation islands or other structures.
 #[derive(Message, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JointGraphChange {
-    /// A joint was added to the [`JointGraph`] of the given [`PhysicsWorld`] entity.
+    /// A joint was added to the [`JointGraph`] of the given [`PhysicsEnvironment`] entity.
     ///
-    /// [`PhysicsWorld`]: crate::world::PhysicsWorld
+    /// [`PhysicsEnvironment`]: crate::environment::PhysicsEnvironment
     Added(Entity, JointId),
-    /// A joint was removed from the [`JointGraph`] of the given [`PhysicsWorld`] entity.
+    /// A joint was removed from the [`JointGraph`] of the given [`PhysicsEnvironment`] entity.
     ///
-    /// [`PhysicsWorld`]: crate::world::PhysicsWorld
+    /// [`PhysicsEnvironment`]: crate::environment::PhysicsEnvironment
     Removed(Entity, JointId),
 }
 
@@ -130,8 +134,8 @@ fn add_joint_to_graph<
 >(
     trigger: On<E>,
     query: Query<(&T, Has<JointCollisionDisabled>), F>,
-    mut worlds: Query<&mut JointGraph, With<crate::world::PhysicsWorld>>,
-    world_lookup: crate::world::PhysicsWorldLookup,
+    mut worlds: Query<&mut JointGraph, With<crate::environment::PhysicsEnvironment>>,
+    world_lookup: crate::environment::PhysicsEnvironmentLookup,
     mut joint_graph_changes: MessageWriter<JointGraphChange>,
     #[cfg(feature = "xpbd_joints")] mut commands: Commands,
 ) {
@@ -144,7 +148,7 @@ fn add_joint_to_graph<
     let [body1, body2] = joint.entities();
 
     // Add the joint to the graph of the world the first body lives in.
-    let world_entity = world_lookup.world_entity_of(body1);
+    let world_entity = world_lookup.environment_of(body1);
     let Ok(mut joint_graph) = worlds.get_mut(world_entity) else {
         return;
     };
@@ -163,8 +167,8 @@ fn add_joint_to_graph<
 
 fn remove_joint_from_graph<E: EventPattern<Event: EntityEvent>>(
     trigger: On<E>,
-    mut worlds: Query<&mut JointGraph, With<crate::world::PhysicsWorld>>,
-    world_lookup: crate::world::PhysicsWorldLookup,
+    mut worlds: Query<&mut JointGraph, With<crate::environment::PhysicsEnvironment>>,
+    world_lookup: crate::environment::PhysicsEnvironmentLookup,
     mut joint_graph_changes: MessageWriter<JointGraphChange>,
     #[cfg(feature = "xpbd_joints")] mut commands: Commands,
 ) {
@@ -172,7 +176,7 @@ fn remove_joint_from_graph<E: EventPattern<Event: EntityEvent>>(
 
     // The joint lives in the graph of its own world (joints between worlds are not
     // supported).
-    let world_entity = world_lookup.world_entity_of(entity);
+    let world_entity = world_lookup.environment_of(entity);
     let Ok(mut joint_graph) = worlds.get_mut(world_entity) else {
         return;
     };
@@ -257,13 +261,13 @@ fn on_disable_joint_collision(
             &mut ContactGraph,
             &mut crate::collision::narrow_phase::ContactStatusChangeQueue,
         ),
-        With<crate::world::PhysicsWorld>,
+        With<crate::environment::PhysicsEnvironment>,
     >,
-    world_lookup: crate::world::PhysicsWorldLookup,
+    world_lookup: crate::environment::PhysicsEnvironmentLookup,
 ) {
     let entity = trigger.entity;
     let Ok((joint_graph, mut contact_graph, mut contact_status_changes)) =
-        worlds.get_mut(world_lookup.world_entity_of(entity))
+        worlds.get_mut(world_lookup.environment_of(entity))
     else {
         return;
     };
@@ -315,14 +319,14 @@ fn on_disable_joint_collision(
 /// Update the joint graph when the entities of a joint change.
 fn on_change_joint_entities<T: Component + EntityConstraint<2>>(
     query: Query<(Entity, &T), Changed<T>>,
-    mut worlds: Query<&mut JointGraph, With<crate::world::PhysicsWorld>>,
-    world_lookup: crate::world::PhysicsWorldLookup,
+    mut worlds: Query<&mut JointGraph, With<crate::environment::PhysicsEnvironment>>,
+    world_lookup: crate::environment::PhysicsEnvironmentLookup,
     mut joint_graph_changes: MessageWriter<JointGraphChange>,
     #[cfg(feature = "xpbd_joints")] mut commands: Commands,
 ) {
     for (entity, joint) in &query {
         let [body1, body2] = joint.entities();
-        let world_entity = world_lookup.world_entity_of(entity);
+        let world_entity = world_lookup.environment_of(entity);
         let Ok(mut joint_graph) = worlds.get_mut(world_entity) else {
             continue;
         };

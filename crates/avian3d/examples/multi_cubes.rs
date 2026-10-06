@@ -1,8 +1,8 @@
 //! Demonstrates multiple physics worlds with different gravity
 //! and transferring entities between them.
 //!
-//! The left stack (blue) uses the default `MainPhysicsWorld` with normal gravity.
-//! The right stack (orange) uses a second `PhysicsWorld` with reduced gravity.
+//! The left stack (blue) uses the default `MainPhysicsEnvironment` with normal gravity.
+//! The right stack (orange) uses a second `PhysicsEnvironment` with reduced gravity.
 //!
 //! Press Space to transfer a random cube from the left world to the right,
 //! or Backspace to transfer one back.
@@ -85,7 +85,7 @@ fn setup(
     // Spawn a second physics world with low gravity.
     let second_world = commands
         .spawn((
-            PhysicsWorld,
+            PhysicsEnvironment,
             Gravity(Vec3::Y * -2.0),
             Name::new("SecondPhysicsWorld"),
         ))
@@ -116,8 +116,7 @@ fn setup(
                     ChildOf(second_world),
                     Mesh3d(cube_mesh.clone()),
                     MeshMaterial3d(orange_material.clone()),
-                    Transform::from_translation(position)
-                        .with_scale(Vec3::splat(cube_size as f32)),
+                    Transform::from_translation(position).with_scale(Vec3::splat(cube_size as f32)),
                     RigidBody::Dynamic,
                     Collider::cuboid(1.0, 1.0, 1.0),
                     OrangeCube,
@@ -165,7 +164,7 @@ fn transfer_cubes(
     blue_cubes: Query<Entity, With<BlueCube>>,
     orange_cubes: Query<Entity, With<OrangeCube>>,
     second_world: Res<SecondWorld>,
-    main_world: Res<MainPhysicsWorldEntity>,
+    main_world: Res<MainPhysicsEnvironmentEntity>,
     mut commands: Commands,
 ) {
     let mut rng = rand::rng();
@@ -173,7 +172,7 @@ fn transfer_cubes(
     // Space: transfer a random blue cube → orange world
     if input.just_pressed(KeyCode::Space) {
         if let Some(entity) = blue_cubes.iter().choose(&mut rng) {
-            commands.trigger(TransferToWorld {
+            commands.trigger(TransferToEnvironment {
                 entity,
                 world: second_world.0,
             });
@@ -195,7 +194,7 @@ fn transfer_cubes(
     // Backspace: transfer a random orange cube → blue world
     if input.just_pressed(KeyCode::Backspace) {
         if let Some(entity) = orange_cubes.iter().choose(&mut rng) {
-            commands.trigger(TransferToWorld {
+            commands.trigger(TransferToEnvironment {
                 entity,
                 world: main_world.0,
             });
@@ -242,5 +241,3 @@ fn color_by_sleep_state(
         }
     }
 }
-
-

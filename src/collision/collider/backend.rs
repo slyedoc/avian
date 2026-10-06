@@ -106,7 +106,7 @@ impl<C: ScalableCollider> Plugin for ColliderBackendPlugin<C> {
 
         // Make sure the necessary resources are initialized.
         app.init_resource::<PhysicsTransformConfig>();
-        // NarrowPhaseConfig and PhysicsLengthUnit are on the PhysicsWorld entity.
+        // NarrowPhaseConfig and PhysicsLengthUnit are on the PhysicsEnvironment entity.
 
         let hooks = app.world_mut().register_component_hooks::<C>();
 

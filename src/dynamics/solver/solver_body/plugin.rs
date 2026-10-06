@@ -5,7 +5,7 @@ use bevy::{
 
 use super::{SolverBodies, SolverBody, SolverBodyIndex, SolverBodyInertia};
 use crate::{
-    AngularVelocity, LinearVelocity, PhysicsSchedule, PhysicsWorld, Position, RigidBody,
+    AngularVelocity, LinearVelocity, PhysicsEnvironment, PhysicsSchedule, Position, RigidBody,
     RigidBodyActiveFilter, RigidBodyDisabled, Rot, Rotation, Sleeping, SolverSystems, Vector,
     dynamics::{
         integrator::CustomPositionIntegration,
@@ -338,7 +338,7 @@ fn writeback_solver_bodies(
         &mut LinearVelocity,
         &mut AngularVelocity,
     )>,
-    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsWorld>>,
+    mut worlds: Query<&mut SolverDiagnostics, With<PhysicsEnvironment>>,
 ) {
     let start = bevy::platform::time::Instant::now();
 

@@ -1,4 +1,7 @@
-use crate::{data_structures::pair_key::PairKey, world::{MainPhysicsWorldEntity, PhysicsWorld}};
+use crate::{
+    data_structures::pair_key::PairKey,
+    environment::{MainPhysicsEnvironmentEntity, PhysicsEnvironment},
+};
 use bevy::{ecs::system::SystemParam, prelude::*};
 
 use super::{ContactGraph, ContactPair};
@@ -52,8 +55,8 @@ use super::{ContactGraph, ContactPair};
 #[derive(SystemParam)]
 pub struct Collisions<'w, 's> {
     /// The [`ContactGraph`] that stores all contact edges.
-    contact_graph: Query<'w, 's, &'static mut ContactGraph, With<PhysicsWorld>>,
-    main_world: Res<'w, MainPhysicsWorldEntity>,
+    contact_graph: Query<'w, 's, &'static mut ContactGraph, With<PhysicsEnvironment>>,
+    main_world: Res<'w, MainPhysicsEnvironmentEntity>,
 }
 
 impl Collisions<'_, '_> {

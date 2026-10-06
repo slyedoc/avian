@@ -90,7 +90,7 @@ use bevy::{
 };
 use core::time::Duration;
 
-use crate::world::PhysicsWorld;
+use crate::environment::PhysicsEnvironment;
 
 /// A plugin that enables writing [physics diagnostics](crate::diagnostics)
 /// to [`bevy::diagnostic::DiagnosticsStore`]. It is not enabled by default
@@ -129,7 +129,9 @@ pub enum PhysicsDiagnosticsSystems {
 }
 
 /// A trait for resources storing timers and counters for [physics diagnostics](crate::diagnostics).
-pub trait PhysicsDiagnostics: Default + Component<Mutability = bevy::ecs::component::Mutable> {
+pub trait PhysicsDiagnostics:
+    Default + Component<Mutability = bevy::ecs::component::Mutable>
+{
     /// Maps diagnostic paths to their respective duration fields.
     fn timer_paths(&self) -> Vec<(&'static DiagnosticPath, Duration)> {
         Vec::new()
@@ -141,7 +143,7 @@ pub trait PhysicsDiagnostics: Default + Component<Mutability = bevy::ecs::compon
     }
 
     /// A system that resets the diagnostics to their default values.
-    fn reset(mut query: Query<&mut Self, With<PhysicsWorld>>) {
+    fn reset(mut query: Query<&mut Self, With<PhysicsEnvironment>>) {
         for mut physics_diagnostics in query.iter_mut() {
             *physics_diagnostics = Self::default();
         }
@@ -149,7 +151,10 @@ pub trait PhysicsDiagnostics: Default + Component<Mutability = bevy::ecs::compon
 
     /// A system that writes diagnostics to the given [`Diagnostics`] instance.
     #[cfg(feature = "bevy_diagnostic")]
-    fn write_diagnostics(query: Query<&Self, With<PhysicsWorld>>, mut diagnostics: Diagnostics) {
+    fn write_diagnostics(
+        query: Query<&Self, With<PhysicsEnvironment>>,
+        mut diagnostics: Diagnostics,
+    ) {
         // TODO: Aggregate diagnostics across all worlds, or report per-world.
         // For now, sum across all worlds.
         for physics_diagnostics in query.iter() {
@@ -186,7 +191,7 @@ impl AppDiagnosticsExt for App {
             return;
         }
 
-        // Diagnostics components are on the PhysicsWorld entity.
+        // Diagnostics components are on the PhysicsEnvironment entity.
 
         // Make sure the system set exists, even if `PhysicsDiagnosticsPlugin` is not added.
         self.configure_sets(

@@ -8,7 +8,7 @@ use bevy::{
 use crate::diagnostics::impl_diagnostic_paths;
 
 use super::{AppDiagnosticsExt, PhysicsDiagnostics, PhysicsSchedule, PhysicsStepSystems};
-use crate::world::PhysicsWorld;
+use crate::environment::PhysicsEnvironment;
 
 /// A plugin that adds diagnostics for total physics timers and counters.
 pub struct PhysicsTotalDiagnosticsPlugin;
@@ -75,7 +75,7 @@ impl_diagnostic_paths! {
 }
 
 fn increment_physics_step_number(
-    mut worlds: Query<&mut PhysicsTotalDiagnostics, With<PhysicsWorld>>,
+    mut worlds: Query<&mut PhysicsTotalDiagnostics, With<PhysicsEnvironment>>,
     mut step: Local<u32>,
 ) {
     *step += 1;
@@ -95,7 +95,7 @@ fn update_physics_step_start(mut start: ResMut<PhysicsStepStart>) {
 
 fn update_step_time(
     start: Res<PhysicsStepStart>,
-    mut worlds: Query<&mut PhysicsTotalDiagnostics, With<PhysicsWorld>>,
+    mut worlds: Query<&mut PhysicsTotalDiagnostics, With<PhysicsEnvironment>>,
 ) {
     let elapsed = start.0.elapsed();
     for mut diagnostics in worlds.iter_mut() {

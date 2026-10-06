@@ -45,7 +45,7 @@
 pub(crate) mod sleeping;
 pub use sleeping::{IslandSleepingPlugin, SleepBody, SleepIslands, WakeBody, WakeIslands};
 
-use crate::world::PhysicsWorld;
+use crate::environment::PhysicsEnvironment;
 use bevy::{
     ecs::{
         entity::{ComponentCloneCtx, SourceComponent},
@@ -76,7 +76,7 @@ pub struct IslandPlugin;
 
 impl Plugin for IslandPlugin {
     fn build(&self, app: &mut App) {
-        // PhysicsIslands is on the PhysicsWorld entity.
+        // PhysicsIslands is on the PhysicsEnvironment entity.
 
         // Insert `BodyIslandNode` for each body that has a solver body.
         app.register_required_components::<SolverBodyIndex, BodyIslandNode>();
@@ -161,7 +161,10 @@ impl Plugin for IslandPlugin {
 }
 
 fn split_island(
-    mut worlds: Query<(&mut PhysicsIslands, &mut ContactGraph, &mut JointGraph), With<PhysicsWorld>>,
+    mut worlds: Query<
+        (&mut PhysicsIslands, &mut ContactGraph, &mut JointGraph),
+        With<PhysicsEnvironment>,
+    >,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     body_colliders: Query<&RigidBodyColliders>,
 ) {
@@ -1396,7 +1399,7 @@ impl BodyIslandNode {
     // Initialize a new island when `BodyIslandNode` is added to a body.
     fn on_add(mut world: DeferredWorld, ctx: HookContext) {
         // Create a new island in the body's physics world.
-        let world_entity = crate::world::find_physics_world_or_main(&world, ctx.entity);
+        let world_entity = crate::environment::find_physics_environment_or_main(&world, ctx.entity);
         let mut islands = world.get_mut::<PhysicsIslands>(world_entity).unwrap();
         let island_id = islands.create_island_with(|island| {
             island.head_body = Some(ctx.entity);
@@ -1410,14 +1413,14 @@ impl BodyIslandNode {
 
         // Cache the physics world entity for O(1) lookup.
         if let Some(mut cached) =
-            world.get_mut::<crate::world::PhysicsWorldEntity>(ctx.entity)
+            world.get_mut::<crate::environment::PhysicsEnvironmentEntity>(ctx.entity)
         {
             cached.0 = world_entity;
         } else {
             world
                 .commands()
                 .entity(ctx.entity)
-                .insert(crate::world::PhysicsWorldEntity(world_entity));
+                .insert(crate::environment::PhysicsEnvironmentEntity(world_entity));
         }
     }
 
@@ -1429,7 +1432,7 @@ impl BodyIslandNode {
         let next_body_entity = body_island.next;
 
         // Find the body's physics world.
-        let world_entity = crate::world::find_physics_world_or_main(&world, ctx.entity);
+        let world_entity = crate::environment::find_physics_environment_or_main(&world, ctx.entity);
 
         // Fix the linked list of bodies in the island.
         if let Some(entity) = prev_body_entity
@@ -1483,7 +1486,7 @@ impl BodyIslandNode {
                         &BodyIslandNode,
                         Or<(With<Disabled>, Without<Disabled>)>,
                     >,
-                          worlds: Query<&PhysicsIslands, With<PhysicsWorld>>| {
+                          worlds: Query<&PhysicsIslands, With<PhysicsEnvironment>>| {
                         for islands in worlds.iter() {
                             let island = islands
                                 .get(island_id)

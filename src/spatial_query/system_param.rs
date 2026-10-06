@@ -1,4 +1,7 @@
-use crate::{collider_tree::ColliderTrees, collision::collider::contact_query, prelude::*, world::PhysicsWorld};
+use crate::{
+    collider_tree::ColliderTrees, collision::collider::contact_query,
+    environment::PhysicsEnvironment, prelude::*,
+};
 use bevy::{ecs::system::SystemParam, prelude::*};
 use parry::query::ShapeCastOptions;
 
@@ -60,13 +63,13 @@ use parry::query::ShapeCastOptions;
 pub struct SpatialQuery<'w, 's> {
     colliders: Query<'w, 's, (&'static Position, &'static Rotation, &'static Collider)>,
     aabbs: Query<'w, 's, &'static ColliderAabb>,
-    collider_trees: Query<'w, 's, &'static ColliderTrees, With<PhysicsWorld>>,
+    collider_trees: Query<'w, 's, &'static ColliderTrees, With<PhysicsEnvironment>>,
     #[cfg(feature = "debug-plugin")]
     tracked_queries: Option<Res<'w, TrackedSpatialQueries>>,
 }
 
 impl SpatialQuery<'_, '_> {
-    /// Every tree of every [`PhysicsWorld`]: spatial queries see the union of all worlds.
+    /// Every tree of every [`PhysicsEnvironment`]: spatial queries see the union of all worlds.
     /// Filter by [`CollisionLayers`] (or keep worlds spatially separated) to scope a query
     /// to one world; a per-world query API is a future refinement.
     fn all_trees(&self) -> impl Iterator<Item = &crate::collider_tree::ColliderTree> {

@@ -97,9 +97,9 @@ impl SolverPlugin {
 
 impl Plugin for SolverPlugin {
     fn build(&self, app: &mut App) {
-        // ContactConstraints and ConstraintGraph are on the PhysicsWorld entity.
+        // ContactConstraints and ConstraintGraph are on the PhysicsEnvironment entity.
 
-        // Update the PhysicsLengthUnit on the MainPhysicsWorld entity.
+        // Update the PhysicsLengthUnit on the MainPhysicsEnvironment entity.
         if self.length_unit != 1.0 {
             let world = app.world_mut();
             let entity = world
@@ -196,7 +196,7 @@ pub fn apply_contact_status_changes(
             &mut ConstraintGraph,
             &mut PhysicsIslands,
         ),
-        With<crate::world::PhysicsWorld>,
+        With<crate::environment::PhysicsEnvironment>,
     >,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     mut commands: Commands,
@@ -226,7 +226,10 @@ pub fn apply_contact_status_changes(
             islands_to_wake.dedup();
 
             // Wake up the islands that were previously sleeping.
-            commands.queue(WakeIslands { world_entity, islands: islands_to_wake });
+            commands.queue(WakeIslands {
+                world_entity,
+                islands: islands_to_wake,
+            });
         }
     }
 }
@@ -234,7 +237,10 @@ pub fn apply_contact_status_changes(
 /// Applies [`JointGraphChange`] messages to [`PhysicsIslands`].
 pub fn apply_joint_graph_changes(
     mut changes: MessageReader<JointGraphChange>,
-    mut worlds: Query<(&JointGraph, &mut PhysicsIslands), With<crate::world::PhysicsWorld>>,
+    mut worlds: Query<
+        (&JointGraph, &mut PhysicsIslands),
+        With<crate::environment::PhysicsEnvironment>,
+    >,
     mut body_islands: Query<&mut BodyIslandNode, Or<(With<Disabled>, Without<Disabled>)>>,
     mut commands: Commands,
 ) {
@@ -292,7 +298,10 @@ pub fn apply_joint_graph_changes(
                 if let Some(world_entity) = batch_world.take()
                     && !batch.is_empty()
                 {
-                    commands.queue(WakeIslands { world_entity, islands: core::mem::take(&mut batch) });
+                    commands.queue(WakeIslands {
+                        world_entity,
+                        islands: core::mem::take(&mut batch),
+                    });
                 }
                 batch_world = Some(world_entity);
             }
@@ -301,7 +310,10 @@ pub fn apply_joint_graph_changes(
         if let Some(world_entity) = batch_world
             && !batch.is_empty()
         {
-            commands.queue(WakeIslands { world_entity, islands: batch });
+            commands.queue(WakeIslands {
+                world_entity,
+                islands: batch,
+            });
         }
     }
 }
@@ -403,7 +415,7 @@ struct CachedContactStatusChangeSystemState(
                 &'static mut ConstraintGraph,
                 &'static mut PhysicsIslands,
             ),
-            With<crate::world::PhysicsWorld>,
+            With<crate::environment::PhysicsEnvironment>,
         >,
         Query<
             'static,
@@ -496,7 +508,11 @@ impl Command for FlushContactStatusChangeQueue {
 
                 // Wake the islands that were previously sleeping.
                 for (world_entity, islands) in wakes {
-                    (WakeIslands { world_entity, islands }).apply(world);
+                    (WakeIslands {
+                        world_entity,
+                        islands,
+                    })
+                    .apply(world);
                 }
             },
         );
@@ -544,7 +560,7 @@ impl Command for FlushContactStatusChangeQueue {
 /// # fn main() {} // Doc test needs main
 /// ```
 #[derive(Component, Clone, Debug, Deref, DerefMut, PartialEq, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct PhysicsLengthUnit(pub f32);
 
 impl Default for PhysicsLengthUnit {
@@ -559,7 +575,7 @@ impl Default for PhysicsLengthUnit {
 /// These are tuned to give good results for most applications, but can
 /// be configured if more control over the simulation behavior is needed.
 #[derive(Component, Clone, Debug, PartialEq, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct SolverConfig {
     /// The damping ratio used for contact stabilization.
     ///
@@ -653,7 +669,7 @@ impl Default for SolverConfig {
 /// **Note**: This resource is updated automatically and not intended to be modified manually.
 /// Use the [`SolverConfig`] resource instead for tuning contact behavior.
 #[derive(Component, Clone, Copy, PartialEq, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct ContactSoftnessCoefficients {
     /// The [`SoftnessCoefficients`] used for contacts against dynamic bodies.
     pub dynamic: SoftnessCoefficients,
@@ -671,7 +687,10 @@ impl Default for ContactSoftnessCoefficients {
 }
 
 fn update_contact_softness(
-    mut worlds: Query<(Ref<SolverConfig>, &mut ContactSoftnessCoefficients), With<PhysicsWorld>>,
+    mut worlds: Query<
+        (Ref<SolverConfig>, &mut ContactSoftnessCoefficients),
+        With<PhysicsEnvironment>,
+    >,
     physics_time: Res<Time<Physics>>,
     substep_time: Res<Time<Substeps>>,
 ) {
@@ -685,9 +704,8 @@ fn update_contact_softness(
             let max_hz = 1.0 / (dt * 2.0);
             let hz = solver_config.contact_frequency_factor * max_hz.min(0.25 / h);
 
-            coefficients.dynamic =
-                SoftnessParameters::new(solver_config.contact_damping_ratio, hz)
-                    .compute_coefficients(h);
+            coefficients.dynamic = SoftnessParameters::new(solver_config.contact_damping_ratio, hz)
+                .compute_coefficients(h);
 
             // TODO: Perhaps the non-dynamic softness should be configurable separately.
             // Make contacts against static and kinematic bodies stiffer to avoid clipping through the environment.
@@ -718,103 +736,111 @@ fn prepare_contact_constraints(
             &NarrowPhaseConfig,
             &ContactSoftnessCoefficients,
         ),
-        With<PhysicsWorld>,
+        With<PhysicsEnvironment>,
     >,
     bodies: Query<BodyQuery, RigidBodyActiveFilter>,
     // TODO(multiworld): solver bodies stay a single global arena; constraints index it.
     solver_bodies: Res<SolverBodies>,
 ) {
-    for (contact_graph, mut constraint_graph, mut diagnostics, narrow_phase_config, contact_softness) in worlds.iter_mut() {
-    let start = crate::utils::Instant::now();
+    for (
+        contact_graph,
+        mut constraint_graph,
+        mut diagnostics,
+        narrow_phase_config,
+        contact_softness,
+    ) in worlds.iter_mut()
+    {
+        let start = crate::utils::Instant::now();
 
-    for color in constraint_graph.colors.iter_mut() {
-        // TODO: Instead of clearing the vector, we could resize it, and just overwrite the old values in the loop below.
-        //       Then the inner loop could be parallelized too.
-        // TODO: Box2D uses an arena allocator for constraints. Might be worth looking into?
-        color.contact_constraints.clear();
-    }
-
-    // Get colors with at least one active manifold handle.
-    let mut active_colors = constraint_graph
-        .colors
-        .iter_mut()
-        .filter(|color| !color.manifold_handles.is_empty())
-        .collect::<Vec<&mut GraphColor>>();
-
-    // Generate contact constraints for each contact pair, parallelizing over graph colors.
-    crate::utils::par_for_each(&mut active_colors, 2, |_i, color| {
-        for handle in color.manifold_handles.iter() {
-            // Get the contact pair and its manifold.
-            let contact_pair = contact_graph
-                .get_by_id(handle.contact_id)
-                .unwrap_or_else(|| {
-                    panic!("Contact pair not found in graph: {:?}", handle.contact_id)
-                })
-                .1;
-            let manifold_index = handle.manifold_index;
-            let manifold = &contact_pair.manifolds[manifold_index];
-
-            if !contact_pair.generates_constraints() {
-                continue;
-            }
-
-            let (Some(body1_entity), Some(body2_entity)) = (contact_pair.body1, contact_pair.body2)
-            else {
-                continue;
-            };
-
-            // Get the two colliding bodies.
-            let Ok(body1) = bodies.get(body1_entity) else {
-                continue;
-            };
-            let Ok(body2) = bodies.get(body2_entity) else {
-                continue;
-            };
-
-            // TODO: To skip this, we probably shouldn't have manifold handles between non-dynamic bodies
-            //       in the constraint graph. Or alternatively, just don't generate contacts at all for them.
-            if !body1.rb.is_dynamic() && !body2.rb.is_dynamic() {
-                // If both bodies are static or kinematic, skip the contact.
-                continue;
-            }
-
-            // Look up the solver body indices and inertias, falling back to dummy inertia
-            // for static bodies without an associated solver body.
-            let index1 = body1.index.copied().unwrap_or(SolverBodyIndex::INVALID);
-            let index2 = body2.index.copied().unwrap_or(SolverBodyIndex::INVALID);
-            let inertia1 = solver_bodies
-                .get_inertia(index1)
-                .unwrap_or(&SolverBodyInertia::DUMMY);
-            let inertia2 = solver_bodies
-                .get_inertia(index2)
-                .unwrap_or(&SolverBodyInertia::DUMMY);
-
-            let constraint = ContactConstraint::generate(
-                index1,
-                index2,
-                inertia1,
-                inertia2,
-                body1.linear_velocity.0,
-                body2.linear_velocity.0,
-                contact_pair.contact_id,
-                manifold,
-                manifold_index,
-                narrow_phase_config.match_contacts,
-                &contact_softness,
-            );
-
-            if !constraint.points.is_empty() {
-                color.contact_constraints.push(constraint);
-            }
+        for color in constraint_graph.colors.iter_mut() {
+            // TODO: Instead of clearing the vector, we could resize it, and just overwrite the old values in the loop below.
+            //       Then the inner loop could be parallelized too.
+            // TODO: Box2D uses an arena allocator for constraints. Might be worth looking into?
+            color.contact_constraints.clear();
         }
-    });
 
-    diagnostics.prepare_constraints += start.elapsed();
-    diagnostics.contact_constraint_count = constraint_graph
-        .colors
-        .iter()
-        .map(|color| color.contact_constraints.len())
-        .sum::<usize>() as u32;
+        // Get colors with at least one active manifold handle.
+        let mut active_colors = constraint_graph
+            .colors
+            .iter_mut()
+            .filter(|color| !color.manifold_handles.is_empty())
+            .collect::<Vec<&mut GraphColor>>();
+
+        // Generate contact constraints for each contact pair, parallelizing over graph colors.
+        crate::utils::par_for_each(&mut active_colors, 2, |_i, color| {
+            for handle in color.manifold_handles.iter() {
+                // Get the contact pair and its manifold.
+                let contact_pair = contact_graph
+                    .get_by_id(handle.contact_id)
+                    .unwrap_or_else(|| {
+                        panic!("Contact pair not found in graph: {:?}", handle.contact_id)
+                    })
+                    .1;
+                let manifold_index = handle.manifold_index;
+                let manifold = &contact_pair.manifolds[manifold_index];
+
+                if !contact_pair.generates_constraints() {
+                    continue;
+                }
+
+                let (Some(body1_entity), Some(body2_entity)) =
+                    (contact_pair.body1, contact_pair.body2)
+                else {
+                    continue;
+                };
+
+                // Get the two colliding bodies.
+                let Ok(body1) = bodies.get(body1_entity) else {
+                    continue;
+                };
+                let Ok(body2) = bodies.get(body2_entity) else {
+                    continue;
+                };
+
+                // TODO: To skip this, we probably shouldn't have manifold handles between non-dynamic bodies
+                //       in the constraint graph. Or alternatively, just don't generate contacts at all for them.
+                if !body1.rb.is_dynamic() && !body2.rb.is_dynamic() {
+                    // If both bodies are static or kinematic, skip the contact.
+                    continue;
+                }
+
+                // Look up the solver body indices and inertias, falling back to dummy inertia
+                // for static bodies without an associated solver body.
+                let index1 = body1.index.copied().unwrap_or(SolverBodyIndex::INVALID);
+                let index2 = body2.index.copied().unwrap_or(SolverBodyIndex::INVALID);
+                let inertia1 = solver_bodies
+                    .get_inertia(index1)
+                    .unwrap_or(&SolverBodyInertia::DUMMY);
+                let inertia2 = solver_bodies
+                    .get_inertia(index2)
+                    .unwrap_or(&SolverBodyInertia::DUMMY);
+
+                let constraint = ContactConstraint::generate(
+                    index1,
+                    index2,
+                    inertia1,
+                    inertia2,
+                    body1.linear_velocity.0,
+                    body2.linear_velocity.0,
+                    contact_pair.contact_id,
+                    manifold,
+                    manifold_index,
+                    narrow_phase_config.match_contacts,
+                    &contact_softness,
+                );
+
+                if !constraint.points.is_empty() {
+                    color.contact_constraints.push(constraint);
+                }
+            }
+        });
+
+        diagnostics.prepare_constraints += start.elapsed();
+        diagnostics.contact_constraint_count = constraint_graph
+            .colors
+            .iter()
+            .map(|color| color.contact_constraints.len())
+            .sum::<usize>() as u32;
     }
 }
 
@@ -823,7 +849,10 @@ fn prepare_contact_constraints(
 /// See [`SubstepSolverSystems::WarmStart`] for more information.
 fn warm_start(
     mut solver_bodies: ResMut<SolverBodies>,
-    mut worlds: Query<(&mut ConstraintGraph, &SolverConfig, &mut SolverDiagnostics), With<PhysicsWorld>>,
+    mut worlds: Query<
+        (&mut ConstraintGraph, &SolverConfig, &mut SolverDiagnostics),
+        With<PhysicsEnvironment>,
+    >,
 ) {
     for (mut constraint_graph, solver_config, mut diagnostics) in worlds.iter_mut() {
         let start = crate::utils::Instant::now();
@@ -910,8 +939,13 @@ fn warm_start_internal(
 fn solve_contacts<const USE_BIAS: bool>(
     mut solver_bodies: ResMut<SolverBodies>,
     mut worlds: Query<
-        (&mut ConstraintGraph, &SolverConfig, &PhysicsLengthUnit, &mut SolverDiagnostics),
-        With<PhysicsWorld>,
+        (
+            &mut ConstraintGraph,
+            &SolverConfig,
+            &PhysicsLengthUnit,
+            &mut SolverDiagnostics,
+        ),
+        With<PhysicsEnvironment>,
     >,
     time: Res<Time>,
 ) {
@@ -1018,8 +1052,13 @@ fn solve_contacts_internal<const USE_BIAS: bool>(
 fn solve_restitution(
     mut solver_bodies: ResMut<SolverBodies>,
     mut worlds: Query<
-        (&mut ConstraintGraph, &SolverConfig, &PhysicsLengthUnit, &mut SolverDiagnostics),
-        With<PhysicsWorld>,
+        (
+            &mut ConstraintGraph,
+            &SolverConfig,
+            &PhysicsLengthUnit,
+            &mut SolverDiagnostics,
+        ),
+        With<PhysicsEnvironment>,
     >,
 ) {
     for (mut constraint_graph, solver_config, length_unit, mut diagnostics) in worlds.iter_mut() {
@@ -1119,8 +1158,12 @@ fn solve_restitution_internal(
 /// They will be used for [warm starting](SubstepSolverSystems::WarmStart).
 fn store_contact_impulses(
     mut worlds: Query<
-        (&mut ContactGraph, &mut ConstraintGraph, &mut SolverDiagnostics),
-        With<PhysicsWorld>,
+        (
+            &mut ContactGraph,
+            &mut ConstraintGraph,
+            &mut SolverDiagnostics,
+        ),
+        With<PhysicsEnvironment>,
     >,
 ) {
     for (mut contact_graph, mut constraint_graph, mut diagnostics) in worlds.iter_mut() {

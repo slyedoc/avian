@@ -182,17 +182,23 @@ pub type PhysicsTransformSet = PhysicsTransformSystems;
 /// Copies transform changes to [`Position`] and [`Rotation`].
 /// This allows users to use transforms for moving and positioning bodies and colliders.
 ///
-/// Computes position relative to the [`PhysicsWorld`] ancestor by walking up the
+/// Computes position relative to the [`PhysicsEnvironment`] ancestor by walking up the
 /// hierarchy and composing [`Transform`]s, avoiding f32 precision loss from [`GlobalTransform`]
 /// at large distances (e.g. when the world is anchored far from the origin under a
 /// floating-origin system). The composition uses [`Scalar`], so it is f32 by default and
 /// f64 when avian's `f64` feature is enabled.
 #[allow(clippy::type_complexity)]
 pub fn transform_to_position(
-    mut query: Query<(Entity, &Transform, Option<&ChildOf>, &mut Position, &mut Rotation)>,
-    ancestors: Query<(&Transform, Option<&ChildOf>, Has<PhysicsWorld>), Without<Position>>,
-    world_lookup: PhysicsWorldLookup,
-    worlds: Query<&PhysicsLengthUnit, With<PhysicsWorld>>,
+    mut query: Query<(
+        Entity,
+        &Transform,
+        Option<&ChildOf>,
+        &mut Position,
+        &mut Rotation,
+    )>,
+    ancestors: Query<(&Transform, Option<&ChildOf>, Has<PhysicsEnvironment>), Without<Position>>,
+    world_lookup: PhysicsEnvironmentLookup,
+    worlds: Query<&PhysicsLengthUnit, With<PhysicsEnvironment>>,
     last_physics_tick: Res<LastPhysicsTick>,
     system_tick: SystemChangeTick,
 ) {
@@ -205,7 +211,7 @@ pub fn transform_to_position(
         system_tick.this_run()
     };
 
-    let world_entity = world_lookup.any_world_entity();
+    let world_entity = world_lookup.any_environment();
     let Ok(length_unit) = worlds.get(world_entity) else {
         return;
     };
@@ -215,7 +221,7 @@ pub fn transform_to_position(
     let rotation_tolerance = 0.1f32.to_radians();
 
     for (_entity, transform, child_of, mut position, mut rotation) in &mut query {
-        // Compose transforms up the hierarchy to the PhysicsWorld ancestor,
+        // Compose transforms up the hierarchy to the PhysicsEnvironment ancestor,
         // staying in f64 to preserve precision at large distances.
         let (composed_translation, composed_rotation) =
             compose_to_physics_world(transform, child_of, &ancestors);
@@ -248,14 +254,14 @@ pub fn transform_to_position(
 }
 
 /// Composes [`Transform`]s from the entity up to (but not including) the nearest
-/// [`PhysicsWorld`] ancestor, returning the accumulated translation and rotation.
+/// [`PhysicsEnvironment`] ancestor, returning the accumulated translation and rotation.
 ///
 /// This avoids reading [`GlobalTransform`] (which suffers f32 precision loss at
 /// large distances) and instead walks the hierarchy composing local transforms.
 fn compose_to_physics_world(
     entity_transform: &Transform,
     entity_child_of: Option<&ChildOf>,
-    ancestors: &Query<(&Transform, Option<&ChildOf>, Has<PhysicsWorld>), Without<Position>>,
+    ancestors: &Query<(&Transform, Option<&ChildOf>, Has<PhysicsEnvironment>), Without<Position>>,
 ) -> (Vector, Quat) {
     // Start with the entity's own transform.
     #[cfg(feature = "2d")]
@@ -264,7 +270,7 @@ fn compose_to_physics_world(
     let mut translation = entity_transform.translation;
     let mut rotation: Quat = entity_transform.rotation;
 
-    // Walk up to the PhysicsWorld, composing ancestor transforms.
+    // Walk up to the PhysicsEnvironment, composing ancestor transforms.
     let Some(&ChildOf(mut current_parent)) = entity_child_of else {
         return (translation, rotation);
     };
@@ -275,7 +281,7 @@ fn compose_to_physics_world(
         else {
             break;
         };
-        // Stop at the PhysicsWorld — it defines the coordinate origin.
+        // Stop at the PhysicsEnvironment — it defines the coordinate origin.
         if is_physics_world {
             break;
         }
@@ -392,8 +398,7 @@ pub fn position_to_transform(
             if let Ok((parent_transform, parent_pos, parent_rot)) = parents.get(parent) {
                 // Compute the parent's physics-space transform using Position/Rotation if available,
                 // falling back to the parent's local Transform.
-                let parent_pos =
-                    parent_pos.map_or(parent_transform.translation, |pos| pos.f32());
+                let parent_pos = parent_pos.map_or(parent_transform.translation, |pos| pos.f32());
                 let parent_rot =
                     parent_rot.map_or(parent_transform.rotation, |rot| Quat::from(*rot));
                 let parent_scale = parent_transform.scale;

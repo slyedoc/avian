@@ -237,8 +237,8 @@ pub fn warm_start_xpbd_motors<
     index_query: Query<&SolverBodyIndex, Without<RigidBodyDisabled>>,
     mut joints: Query<(&C, &mut C::SolverData), (Without<RigidBody>, Without<JointDisabled>)>,
     time: Res<Time>,
-    worlds: Query<&SolverConfig, With<PhysicsWorld>>,
-    main_world: Res<MainPhysicsWorldEntity>,
+    worlds: Query<&SolverConfig, With<PhysicsEnvironment>>,
+    main_world: Res<MainPhysicsEnvironmentEntity>,
 ) where
     C::SolverData: Component<Mutability = Mutable>,
 {

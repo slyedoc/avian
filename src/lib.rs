@@ -552,7 +552,7 @@ pub mod picking;
 pub mod schedule;
 pub mod spatial_query;
 
-pub mod world;
+pub mod environment;
 
 pub mod data_structures;
 
@@ -577,6 +577,11 @@ pub mod prelude {
         collider_tree::{ColliderTreeOptimization, ColliderTreePlugin, TreeOptimizationMode},
         collision::prelude::*,
         dynamics::{self, prelude::*},
+        environment::{
+            EnvironmentTransferred, MainPhysicsEnvironment, MainPhysicsEnvironmentEntity,
+            PhysicsEnvironment, PhysicsEnvironmentLookup, PhysicsEnvironmentPlugin,
+            TransferToEnvironment,
+        },
         interpolation::*,
         physics_transform::{PhysicsTransformHelper, PhysicsTransformPlugin, Position, Rotation},
         schedule::{
@@ -584,10 +589,6 @@ pub mod prelude {
             PhysicsStepSystems, PhysicsSystems, PhysicsTime, Substeps,
         },
         spatial_query::{self, *},
-        world::{
-            MainPhysicsWorld, MainPhysicsWorldEntity, PhysicsWorld, PhysicsWorldLookup,
-            PhysicsWorldPlugin, TransferToWorld, WorldTransferred,
-        },
     };
 
     #[cfg(all(
@@ -609,7 +610,7 @@ mod utils;
 mod tests;
 
 /// Test helper: set a per-world config component (`Gravity`, `SubstepCount`, …) on the
-/// auto-spawned [`MainPhysicsWorld`](crate::world::MainPhysicsWorld) entity. Replaces the
+/// auto-spawned [`MainPhysicsEnvironment`](crate::environment::MainPhysicsEnvironment) entity. Replaces the
 /// old `insert_resource` calls now that physics config lives on the world entity.
 #[cfg(test)]
 pub(crate) fn set_main_world_component<T: bevy::prelude::Component>(
@@ -618,7 +619,7 @@ pub(crate) fn set_main_world_component<T: bevy::prelude::Component>(
 ) {
     let entity = app
         .world()
-        .resource::<crate::world::MainPhysicsWorldEntity>()
+        .resource::<crate::environment::MainPhysicsEnvironmentEntity>()
         .0;
     app.world_mut().entity_mut(entity).insert(value);
 }
@@ -804,7 +805,7 @@ impl Default for PhysicsPlugins {
 impl PluginGroup for PhysicsPlugins {
     fn build(self) -> PluginGroupBuilder {
         let builder = PluginGroupBuilder::start::<Self>()
-            .add(PhysicsWorldPlugin)
+            .add(PhysicsEnvironmentPlugin)
             .add(PhysicsSchedulePlugin::new(self.schedule))
             .add(MassPropertyPlugin::new(self.schedule))
             .add(ForcePlugin)

@@ -73,7 +73,7 @@ impl<C: AnyCollider> Plugin for ColliderTreePlugin<C> {
         }
 
         // Initialize resources.
-        // ColliderTrees and MovedProxies are on the PhysicsWorld entity.
+        // ColliderTrees and MovedProxies are on the PhysicsEnvironment entity.
 
         // Configure system sets.
         app.configure_sets(
