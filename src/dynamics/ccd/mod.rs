@@ -604,7 +604,7 @@ fn solve_continuous(
     >,
     main_world: Res<MainPhysicsWorldEntity>,
 ) {
-    let Ok((trees, mut contact_graph, narrow_phase_config, mut diagnostics)) =
+    let Ok((trees, mut contact_graph, _narrow_phase_config, mut diagnostics)) =
         worlds.get_mut(main_world.0)
     else {
         return;

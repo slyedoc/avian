@@ -8,7 +8,7 @@ use crate::{
     data_structures::pair_key::PairKey,
     dynamics::joints::EntityConstraint,
     prelude::{
-        ContactGraph, ContactStatusChange, ContactStatusChangeQueue, JointCollisionDisabled,
+        ContactGraph, ContactStatusChange, JointCollisionDisabled,
         JointDisabled, PhysicsSchedule, PhysicsStepSystems, RigidBodyColliders,
     },
 };

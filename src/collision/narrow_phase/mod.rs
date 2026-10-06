@@ -18,7 +18,6 @@
 //! [`ContactConstraint`]: dynamics::solver::contact::ContactConstraint
 
 pub(crate) mod system_param;
-use system_param::ContactStatusBits;
 #[cfg(feature = "parallel")]
 use system_param::NarrowPhaseThreadLocals;
 pub use system_param::{
@@ -27,7 +26,7 @@ pub use system_param::{
 
 use core::marker::PhantomData;
 
-use crate::{dynamics::joints::joint_graph::JointGraph, prelude::*};
+use crate::prelude::*;
 use bevy::{
     ecs::{
         entity_disabling::Disabled,

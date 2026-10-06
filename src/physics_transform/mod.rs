@@ -16,14 +16,12 @@ mod tests;
 use crate::{
     prelude::*,
     schedule::{LastPhysicsTick, is_changed_after_tick},
-    utils::{MIN_PAR_ITER_ENTITIES, ParallelQueryForEach},
 };
 use approx::AbsDiffEq;
 use bevy::{
     ecs::{
         change_detection::Tick, intern::Interned, schedule::ScheduleLabel, system::SystemChangeTick,
     },
-    math::Affine3A,
     prelude::*,
     transform::systems::{mark_dirty_trees, propagate_parent_transforms, sync_simple_transforms},
 };
@@ -249,62 +247,6 @@ pub fn transform_to_position(
     }
 }
 
-/// The cosine of the angle below which a difference between the `GlobalTransform` rotation
-/// and [`Rotation`] is ignored. This corresponds to an angle of 0.1 degrees.
-const ROTATION_COS_TOLERANCE: f32 = 0.999_998_5;
-
-/// Returns the cosine of the angle between two rotations.
-///
-/// This is a cheaper alternative to `Rotation::angle_between`,
-/// as it avoids inverse trigonometric functions.
-#[inline]
-fn cos_angle_between(a: Rotation, b: Rotation) -> f32 {
-    #[cfg(feature = "2d")]
-    {
-        a.cos * b.cos + a.sin * b.sin
-    }
-    #[cfg(feature = "3d")]
-    {
-        // The angle between two unit quaternions is `2 * acos(|dot|)`,
-        // and `cos(2 * acos(x)) == 2 * x^2 - 1`.
-        let dot = a.dot(b.0);
-        2.0 * dot * dot - 1.0
-    }
-}
-
-/// Extracts the [`Rotation`] from the affine transform of a `GlobalTransform`.
-///
-/// This is equivalent to `Rotation::from(global_transform.compute_transform().rotation)`,
-/// but avoids the full scale-rotation-translation decomposition, which is comparatively expensive.
-#[inline]
-fn rotation_from_affine(affine: &Affine3A) -> Rotation {
-    let mat = affine.matrix3;
-
-    let det_sign = mat.determinant().signum();
-
-    #[cfg(feature = "2d")]
-    {
-        let x_axis = Vec2::new(mat.x_axis.x, mat.x_axis.y) * det_sign;
-        let x_axis = x_axis.normalize_or(Vec2::X);
-        Rotation {
-            cos: x_axis.x,
-            sin: x_axis.y,
-        }
-    }
-    #[cfg(feature = "3d")]
-    {
-        let x_axis = (mat.x_axis * det_sign).normalize_or(Vec3A::X);
-        let y_axis = mat.y_axis.normalize_or(Vec3A::Y);
-        let z_axis = mat.z_axis.normalize_or(Vec3A::Z);
-        Rotation(Quat::from_mat3a(&Mat3A::from_cols(x_axis, y_axis, z_axis)))
-    }
-}
-
-/// Composes [`Transform`]s from the entity up to (but not including) the nearest
-/// [`PhysicsWorld`] ancestor, returning the accumulated translation and rotation.
-///
-/// This avoids reading [`GlobalTransform`] (which suffers f32 precision loss at
-/// large distances) and instead walks the hierarchy using f64 arithmetic.
 /// Composes [`Transform`]s from the entity up to (but not including) the nearest
 /// [`PhysicsWorld`] ancestor, returning the accumulated translation and rotation.
 ///

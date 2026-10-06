@@ -67,7 +67,6 @@ struct RigidBodyQuery {
 /// [`ConstraintGraph`]: crate::dynamics::solver::constraint_graph::ConstraintGraph
 /// [`PhysicsIslands`]: crate::dynamics::solver::islands::PhysicsIslands
 #[derive(SystemParam)]
-#[expect(missing_docs)]
 pub struct NarrowPhase<'w, 's, C: AnyCollider> {
     collider_query: Query<'w, 's, ColliderQuery<C>, Without<ColliderDisabled>>,
     colliding_entities_query: Query<'w, 's, &'static mut CollidingEntities>,
@@ -97,7 +96,7 @@ pub struct NarrowPhaseWorldQuery {
 /// A bit vector for tracking contact status changes.
 /// Set bits correspond to contact pairs that were either added or removed.
 #[derive(Component, Default, Deref, DerefMut)]
-pub(crate) struct ContactStatusBits(pub BitVec);
+pub struct ContactStatusBits(pub BitVec);
 
 /// Thread-local data for the narrow phase contact updates.
 #[cfg(feature = "parallel")]

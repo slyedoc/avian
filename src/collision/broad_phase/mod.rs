@@ -156,9 +156,7 @@
 mod bvh_broad_phase;
 pub use bvh_broad_phase::BvhBroadPhasePlugin;
 
-use crate::{
-    collision::CollisionDiagnostics, dynamics::joints::joint_graph::JointGraph, prelude::*,
-};
+use crate::{collision::CollisionDiagnostics, prelude::*};
 use bevy::prelude::*;
 
 /// The core [broad phase](crate::collision::broad_phase) plugin that sets up the
