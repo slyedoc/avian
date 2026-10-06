@@ -215,3 +215,108 @@ fn no_ambiguity_errors() {
     .finish();
     app.update();
 }
+
+#[cfg(all(feature = "3d", feature = "default-collider"))]
+mod multiworld {
+    use super::*;
+    use crate::collider_tree::{ColliderTreeProxyKey, ColliderTrees};
+    use crate::world::{MainPhysicsWorldEntity, PhysicsWorldEntity};
+
+    fn spawn_ball(app: &mut App) -> Entity {
+        app.world_mut()
+            .spawn((
+                RigidBody::Dynamic,
+                Collider::sphere(0.5),
+                Transform::from_xyz(0.0, 2.0, 0.0),
+            ))
+            .id()
+    }
+
+    fn spawn_floor(app: &mut App, parent: Option<Entity>) -> Entity {
+        let mut floor = app.world_mut().spawn((
+            RigidBody::Static,
+            Collider::cuboid(20.0, 1.0, 20.0),
+            Transform::from_xyz(0.0, -0.5, 0.0),
+        ));
+        if let Some(parent) = parent {
+            floor.insert(ChildOf(parent));
+        }
+        floor.id()
+    }
+
+    fn settle(app: &mut App, ball: Entity) -> f32 {
+        for _ in 0..120 {
+            tick_app(app, 1.0 / 60.0);
+        }
+        app.world().get::<Position>(ball).unwrap().y as f32
+    }
+
+    #[test]
+    fn reparented_body_moves_to_new_world() {
+        let mut app = create_app();
+        let other = app.world_mut().spawn(PhysicsWorld).id();
+        spawn_floor(&mut app, Some(other));
+        let holder = app.world_mut().spawn(Transform::default()).id();
+        let ball = spawn_ball(&mut app);
+        app.world_mut().entity_mut(ball).insert(ChildOf(holder));
+        tick_app(&mut app, 1.0 / 60.0);
+        let main = app.world().resource::<MainPhysicsWorldEntity>().0;
+        assert_eq!(app.world().get::<PhysicsWorldEntity>(ball).unwrap().0, main);
+
+        app.world_mut().entity_mut(holder).insert(ChildOf(other));
+        app.world_mut().flush();
+        assert_eq!(app.world().get::<PhysicsWorldEntity>(ball).unwrap().0, other);
+        assert!(settle(&mut app, ball) > 0.0, "ball rests on the other world's floor");
+
+        app.world_mut().entity_mut(holder).remove::<ChildOf>();
+        app.world_mut().flush();
+        assert_eq!(app.world().get::<PhysicsWorldEntity>(ball).unwrap().0, main);
+        assert!(settle(&mut app, ball) < -1.0, "main has no floor");
+    }
+
+    #[test]
+    fn reparented_standalone_collider_moves_to_new_world() {
+        let mut app = create_app();
+        let other = app.world_mut().spawn(PhysicsWorld).id();
+        let main = app.world().resource::<MainPhysicsWorldEntity>().0;
+        let collider = app
+            .world_mut()
+            .spawn((Collider::sphere(1.0), Transform::default()))
+            .id();
+        tick_app(&mut app, 1.0 / 60.0);
+        let holds = |app: &App, world: Entity| {
+            let key = *app.world().get::<ColliderTreeProxyKey>(collider).unwrap();
+            app.world()
+                .get::<ColliderTrees>(world)
+                .unwrap()
+                .get_proxy(key)
+                .is_some_and(|proxy| proxy.collider == collider)
+        };
+        assert!(holds(&app, main));
+
+        app.world_mut().entity_mut(collider).insert(ChildOf(other));
+        app.world_mut().flush();
+        assert!(holds(&app, other) && !holds(&app, main));
+        tick_app(&mut app, 1.0 / 60.0);
+
+        app.world_mut().entity_mut(collider).despawn();
+        tick_app(&mut app, 1.0 / 60.0);
+    }
+
+    #[test]
+    fn despawning_a_world_with_its_bodies() {
+        let mut app = create_app();
+        let other = app.world_mut().spawn(PhysicsWorld).id();
+        spawn_floor(&mut app, Some(other));
+        let ball = spawn_ball(&mut app);
+        app.world_mut().entity_mut(ball).insert(ChildOf(other));
+        for _ in 0..10 {
+            tick_app(&mut app, 1.0 / 60.0);
+        }
+        app.world_mut().entity_mut(other).despawn();
+        for _ in 0..10 {
+            tick_app(&mut app, 1.0 / 60.0);
+        }
+        assert!(app.world().get_entity(ball).is_err());
+    }
+}

@@ -1432,16 +1432,21 @@ impl BodyIslandNode {
         let world_entity = crate::world::find_physics_world_or_main(&world, ctx.entity);
 
         // Fix the linked list of bodies in the island.
-        if let Some(entity) = prev_body_entity {
-            let mut prev_body_island = world.get_mut::<BodyIslandNode>(entity).unwrap();
+        if let Some(entity) = prev_body_entity
+            && let Some(mut prev_body_island) = world.get_mut::<BodyIslandNode>(entity)
+        {
             prev_body_island.next = next_body_entity;
         }
-        if let Some(entity) = next_body_entity {
-            let mut next_body_island = world.get_mut::<BodyIslandNode>(entity).unwrap();
+        if let Some(entity) = next_body_entity
+            && let Some(mut next_body_island) = world.get_mut::<BodyIslandNode>(entity)
+        {
             next_body_island.prev = prev_body_entity;
         }
 
-        let mut islands = world.get_mut::<PhysicsIslands>(world_entity).unwrap();
+        // The world may already be despawned along with its bodies.
+        let Some(mut islands) = world.get_mut::<PhysicsIslands>(world_entity) else {
+            return;
+        };
         let island = islands
             .get_mut(island_id)
             .unwrap_or_else(|| panic!("Island {island_id} does not exist"));

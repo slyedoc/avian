@@ -248,56 +248,106 @@ pub struct WorldTransferred {
 /// 4. Creates a new island in the target world's [`PhysicsIslands`]
 /// 5. Re-registers collider proxy via deferred [`ColliderOf`] re-insert
 /// 6. Wakes sleeping islands in the target world
+#[derive(SystemParam)]
 #[allow(clippy::type_complexity)]
-fn on_transfer_to_world(
-    trigger: On<TransferToWorld>,
-    mut collider_keys: Query<(
-        &mut ColliderTreeProxyKey,
-        Option<&RigidBodyColliders>,
-        Option<&ColliderOf>,
-        &ColliderAabb,
-        Option<&CollisionLayers>,
-        Has<Sensor>,
-        Has<CollisionEventsEnabled>,
-        Option<&ActiveCollisionHooks>,
-    )>,
-    bodies: Query<(&RigidBody, Has<RigidBodyDisabled>)>,
-    mut body_islands: Query<&mut BodyIslandNode>,
-    mut sleep_timers: Query<&mut crate::dynamics::rigid_body::sleeping::SleepTimer>,
-    mut world_cache: Query<&mut PhysicsWorldEntity>,
-    parents: Query<&ChildOf>,
-    physics_worlds: Query<(), With<PhysicsWorld>>,
-    main_world: Res<MainPhysicsWorldEntity>,
-    mut world_state: Query<
-        (&mut ColliderTrees, &mut MovedProxies, &mut PhysicsIslands, &mut AwakeIslandBitVec),
+struct TransferParams<'w, 's> {
+    collider_keys: Query<
+        'w,
+        's,
+        (
+            &'static mut ColliderTreeProxyKey,
+            Option<&'static RigidBodyColliders>,
+            Option<&'static ColliderOf>,
+            &'static ColliderAabb,
+            Option<&'static CollisionLayers>,
+            Has<Sensor>,
+            Has<CollisionEventsEnabled>,
+            Option<&'static ActiveCollisionHooks>,
+        ),
+    >,
+    bodies: Query<'w, 's, (&'static RigidBody, Has<RigidBodyDisabled>)>,
+    body_islands: Query<'w, 's, &'static mut BodyIslandNode>,
+    sleep_timers: Query<'w, 's, &'static mut crate::dynamics::rigid_body::sleeping::SleepTimer>,
+    world_cache: Query<'w, 's, &'static mut PhysicsWorldEntity>,
+    parents: Query<'w, 's, &'static ChildOf>,
+    physics_worlds: Query<'w, 's, (), With<PhysicsWorld>>,
+    main_world: Res<'w, MainPhysicsWorldEntity>,
+    world_state: Query<
+        'w,
+        's,
+        (
+            &'static mut ColliderTrees,
+            &'static mut MovedProxies,
+            &'static mut PhysicsIslands,
+            &'static mut AwakeIslandBitVec,
+        ),
         With<PhysicsWorld>,
     >,
     // Frame anchors' own motion (kinematic movers like a flying ship); static frames
     // simply lack these. `With`/`Without<PhysicsWorld>` keeps the two velocity queries
     // archetype-disjoint, so the mutable body query doesn't conflict with the frame read.
-    frame_vels: Query<(Option<&LinearVelocity>, Option<&AngularVelocity>), With<PhysicsWorld>>,
-    mut body_vels: Query<(&mut LinearVelocity, &mut AngularVelocity), Without<PhysicsWorld>>,
-    mut commands: Commands,
-) {
-    let entity = trigger.event_target();
-    let target_world = trigger.event().world;
+    frame_vels: Query<
+        'w,
+        's,
+        (Option<&'static LinearVelocity>, Option<&'static AngularVelocity>),
+        With<PhysicsWorld>,
+    >,
+    body_vels:
+        Query<'w, 's, (&'static mut LinearVelocity, &'static mut AngularVelocity), Without<PhysicsWorld>>,
+    commands: Commands<'w, 's>,
+}
 
-    // Read old world from cache, fallback to hierarchy walk.
-    let old_world = world_cache
-        .get(entity)
-        .map(|c| c.0)
-        .unwrap_or_else(|_| {
-            let mut current = entity;
-            loop {
-                if physics_worlds.contains(current) {
-                    return current;
-                }
-                match parents.get(current) {
-                    Ok(child_of) => current = child_of.get(),
-                    Err(_) => return main_world.0,
-                }
+impl TransferParams<'_, '_> {
+    // Cached world, falling back to a hierarchy walk.
+    fn current_world(&self, entity: Entity) -> Entity {
+        if let Ok(cached) = self.world_cache.get(entity) {
+            return cached.0;
+        }
+        let mut current = entity;
+        loop {
+            if self.physics_worlds.contains(current) {
+                return current;
             }
-        });
+            match self.parents.get(current) {
+                Ok(child_of) => current = child_of.get(),
+                Err(_) => return self.main_world.0,
+            }
+        }
+    }
+}
+
+fn on_transfer_to_world(trigger: On<TransferToWorld>, mut p: TransferParams) {
+    let entity = trigger.event_target();
+    let from = p.current_world(entity);
+    transfer(&mut p, entity, from, trigger.event().world, true);
+}
+
+/// Moves an entity's physics state between worlds after its hierarchy already changed.
+#[derive(EntityEvent, Clone, Copy, Debug)]
+pub(crate) struct RehomeToWorld {
+    entity: Entity,
+    from: Entity,
+    to: Entity,
+}
+
+fn on_rehome_to_world(trigger: On<RehomeToWorld>, mut p: TransferParams) {
+    let event = trigger.event();
+    transfer(&mut p, event.entity, event.from, event.to, false);
+}
+
+fn transfer(p: &mut TransferParams, entity: Entity, old_world: Entity, target_world: Entity, reparent: bool) {
+    let TransferParams {
+        collider_keys,
+        bodies,
+        body_islands,
+        sleep_timers,
+        world_cache,
+        world_state,
+        frame_vels,
+        body_vels,
+        commands,
+        ..
+    } = p;
 
     if old_world == target_world {
         return; // Already in the target world.
@@ -316,9 +366,9 @@ fn on_transfer_to_world(
         .and_then(|(_, body_colliders, ..)| body_colliders.map(|c| c.iter().collect()))
         .unwrap_or_default();
 
-    remove_proxy_from_world(entity, old_world, &mut collider_keys, &mut world_state);
+    remove_proxy_from_world(entity, old_world, collider_keys, world_state);
     for collider in child_colliders_for_remove {
-        remove_proxy_from_world(collider, old_world, &mut collider_keys, &mut world_state);
+        remove_proxy_from_world(collider, old_world, collider_keys, world_state);
     }
 
     // --- 2. Unlink body from old world's island ---
@@ -379,7 +429,9 @@ fn on_transfer_to_world(
     }
 
     // --- 3. Re-parent to new world (deferred — only affects hierarchy lookup) ---
-    commands.entity(entity).insert(ChildOf(target_world));
+    if reparent {
+        commands.entity(entity).insert(ChildOf(target_world));
+    }
 
     // --- 5. Add collider proxy to new world's tree (direct) ---
     // Collect child collider entities first to avoid borrow conflicts.
@@ -389,9 +441,9 @@ fn on_transfer_to_world(
         .and_then(|(_, body_colliders, ..)| body_colliders.map(|c| c.iter().collect()))
         .unwrap_or_default();
 
-    add_proxy_to_world(entity, target_world, &mut collider_keys, &bodies, &mut world_state);
+    add_proxy_to_world(entity, target_world, collider_keys, bodies, world_state);
     for collider in child_colliders {
-        add_proxy_to_world(collider, target_world, &mut collider_keys, &bodies, &mut world_state);
+        add_proxy_to_world(collider, target_world, collider_keys, bodies, world_state);
     }
 
     // --- 6. Wake the transferred entity and affected islands ---
@@ -437,7 +489,7 @@ fn on_transfer_to_world(
         |w: Entity| frame_vels.get(w).ok().and_then(|(l, _)| l).map_or(LinearVelocity::default().0, |l| l.0);
     let frame_ang =
         |w: Entity| frame_vels.get(w).ok().and_then(|(_, a)| a).map_or(AngularVelocity::default().0, |a| a.0);
-    if let Ok((mut lin, mut ang)) = body_vels.get_mut(entity) {
+    if reparent && let Ok((mut lin, mut ang)) = body_vels.get_mut(entity) {
         lin.0 += frame_lin(old_world) - frame_lin(target_world);
         ang.0 += frame_ang(old_world) - frame_ang(target_world);
     }
@@ -551,6 +603,86 @@ fn add_proxy_to_world(
     moved_proxies.insert(new_key);
 }
 
+// --- Re-homing after hierarchy changes ---
+
+/// Entities whose parent changed since the last drain.
+#[derive(Resource, Default)]
+struct PendingRehome(Vec<Entity>);
+
+fn queue_rehome(entity: Entity, mut pending: ResMut<PendingRehome>, mut commands: Commands) {
+    if pending.0.is_empty() {
+        commands.queue(drain_rehome);
+    }
+    pending.0.push(entity);
+}
+
+// Bodies and standalone colliders under a reparented entity follow it to its new world.
+fn drain_rehome(world: &mut World) {
+    let roots = core::mem::take(&mut world.resource_mut::<PendingRehome>().0);
+    let mut worlds = world.query_filtered::<(Entity, &ColliderTrees), With<PhysicsWorld>>();
+    let main = world.resource::<MainPhysicsWorldEntity>().0;
+    worlds.update_archetypes(world);
+    let mut seen = bevy::ecs::entity::EntityHashSet::default();
+    let mut moves = Vec::new();
+    for root in roots {
+        if world.get_entity(root).is_err() || world.get::<PhysicsWorld>(root).is_some() {
+            continue;
+        }
+        let mut stack = vec![(root, hierarchy_world(world, root, main))];
+        while let Some((entity, target)) = stack.pop() {
+            if !seen.insert(entity) || world.get::<PhysicsWorld>(entity).is_some() {
+                continue;
+            }
+            if let Some(from) = physics_home(world, &mut worlds, entity)
+                && from != target
+            {
+                moves.push((entity, from, target));
+            }
+            if let Some(children) = world.get::<Children>(entity) {
+                stack.extend(children.iter().map(|child| (child, target)));
+            }
+        }
+    }
+    for (entity, from, to) in moves {
+        world.trigger(RehomeToWorld { entity, from, to });
+    }
+}
+
+fn hierarchy_world(world: &World, entity: Entity, main: Entity) -> Entity {
+    let mut current = entity;
+    loop {
+        if world.get::<PhysicsWorld>(current).is_some() {
+            return current;
+        }
+        match world.get::<ChildOf>(current) {
+            Some(child_of) => current = child_of.get(),
+            None => return main,
+        }
+    }
+}
+
+// The world an entity's physics state lives in: a body's cache, or the tree holding a
+// standalone collider's proxy. Colliders attached to another body move with it.
+fn physics_home(
+    world: &World,
+    worlds: &mut QueryState<(Entity, &ColliderTrees), With<PhysicsWorld>>,
+    entity: Entity,
+) -> Option<Entity> {
+    if world.get::<BodyIslandNode>(entity).is_some() {
+        return world.get::<PhysicsWorldEntity>(entity).map(|cached| cached.0);
+    }
+    let key = *world.get::<ColliderTreeProxyKey>(entity)?;
+    if key == ColliderTreeProxyKey::PLACEHOLDER
+        || world.get::<ColliderOf>(entity).is_some_and(|of| of.body != entity)
+    {
+        return None;
+    }
+    worlds
+        .iter_manual(world)
+        .find(|(_, trees)| trees.get_proxy(key).is_some_and(|proxy| proxy.collider == entity))
+        .map(|(world_entity, _)| world_entity)
+}
+
 /// Plugin that spawns the [`MainPhysicsWorld`] entity and registers transfer handling.
 pub struct PhysicsWorldPlugin;
 
@@ -560,7 +692,15 @@ impl Plugin for PhysicsWorldPlugin {
     // late `register_required_components` on PhysicsWorld; nothing here needs that.)
     fn build(&self, app: &mut App) {
         // Register the transfer observer.
-        app.add_observer(on_transfer_to_world);
+        app.add_observer(on_transfer_to_world)
+            .add_observer(on_rehome_to_world)
+            .init_resource::<PendingRehome>()
+            .add_observer(|trigger: On<Insert<ChildOf>>, pending: ResMut<PendingRehome>, commands: Commands| {
+                queue_rehome(trigger.entity, pending, commands);
+            })
+            .add_observer(|trigger: On<Remove<ChildOf>>, pending: ResMut<PendingRehome>, commands: Commands| {
+                queue_rehome(trigger.entity, pending, commands);
+            });
 
         let entity = app.world_mut().spawn(MainPhysicsWorld).id();
         app.insert_resource(MainPhysicsWorldEntity(entity));

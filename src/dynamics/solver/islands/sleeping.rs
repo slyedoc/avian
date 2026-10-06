@@ -378,8 +378,8 @@ impl Command for SleepBody {
                         mut joint_graph_query,
                     ) = state.0.get_mut(world).expect("Failed to get system state");
                     let mut islands = islands_query.get_mut(world_entity).unwrap();
-                    let mut contact_graph = contact_graph_query.get_mut(world_entity).unwrap();
-                    let mut joint_graph = joint_graph_query.get_mut(world_entity).unwrap();
+                    let contact_graph = contact_graph_query.get_mut(world_entity).unwrap();
+                    let joint_graph = joint_graph_query.get_mut(world_entity).unwrap();
 
                     let Some(island) = islands.get_mut(island_id) else {
                         return;
@@ -449,9 +449,14 @@ impl Command for SleepIslands {
         world.try_resource_scope(|world, mut state: Mut<CachedIslandSleepingSystemState>| {
             let (bodies, mut islands_query, mut contact_graph_query, mut constraint_graph_query) =
                 state.0.get_mut(world).expect("Failed to get system state");
-            let mut islands = islands_query.get_mut(self.world_entity).unwrap();
-            let mut contact_graph = contact_graph_query.get_mut(self.world_entity).unwrap();
-            let mut constraint_graph = constraint_graph_query.get_mut(self.world_entity).unwrap();
+            // The world may have been despawned since the wake was queued.
+            let (Ok(mut islands), Ok(mut contact_graph), Ok(mut constraint_graph)) = (
+                islands_query.get_mut(self.world_entity),
+                contact_graph_query.get_mut(self.world_entity),
+                constraint_graph_query.get_mut(self.world_entity),
+            ) else {
+                return;
+            };
 
             let mut bodies_to_sleep = Vec::<(Entity, Sleeping)>::new();
             let mut colliders_to_sleep = Vec::<Entity>::new();
@@ -579,9 +584,14 @@ impl Command for WakeIslands {
         world.try_resource_scope(|world, mut state: Mut<CachedIslandWakingSystemState>| {
             let (mut bodies, mut islands_query, mut contact_graph_query, mut constraint_graph_query) =
                 state.0.get_mut(world).expect("Failed to get system state");
-            let mut islands = islands_query.get_mut(self.world_entity).unwrap();
-            let mut contact_graph = contact_graph_query.get_mut(self.world_entity).unwrap();
-            let mut constraint_graph = constraint_graph_query.get_mut(self.world_entity).unwrap();
+            // The world may have been despawned since the wake was queued.
+            let (Ok(mut islands), Ok(mut contact_graph), Ok(mut constraint_graph)) = (
+                islands_query.get_mut(self.world_entity),
+                contact_graph_query.get_mut(self.world_entity),
+                constraint_graph_query.get_mut(self.world_entity),
+            ) else {
+                return;
+            };
 
             let mut bodies_to_wake = Vec::<Entity>::new();
 
