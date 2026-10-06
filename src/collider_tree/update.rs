@@ -1268,7 +1268,8 @@ mod tests {
         app.update();
 
         let key = proxy_key(&app, collider);
-        let trees = app.world().resource::<ColliderTrees>();
+        let main_world = app.world().resource::<MainPhysicsWorldEntity>().0;
+        let trees = app.world().get::<ColliderTrees>(main_world).unwrap();
         assert!(
             key.is_standalone(),
             "proxy key should point to the standalone tree after the body is removed, got {key:?}"

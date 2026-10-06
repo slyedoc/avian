@@ -31,7 +31,6 @@ use bevy::{
         query::Has,
         system::{StaticSystemParam, SystemParam, SystemParamItem},
     },
-    math::bounding::Aabb3d,
     prelude::*,
 };
 
@@ -648,9 +647,12 @@ fn debug_render_tracked_spatial_queries(
     store: Res<GizmoConfigStore>,
     mut queries: ResMut<TrackedSpatialQueries>,
     mut shape_intersections: ResMut<TrackedShapeIntersections>,
-    length_unit: Res<PhysicsLengthUnit>,
+    main_world: Res<MainPhysicsWorldEntity>,
+    length_units: Query<&PhysicsLengthUnit>,
 ) {
     let config = store.config::<PhysicsGizmos>().1;
+    // Spatial queries see every world; their markers take the main world's scale.
+    let length_unit = length_units.get(main_world.0).map_or(1.0, |unit| unit.0);
 
     shape_intersections.clear();
 
@@ -675,7 +677,7 @@ fn debug_render_tracked_spatial_queries(
                     arrow_color,
                     point_color,
                     normal_color,
-                    **length_unit,
+                    length_unit,
                 );
             }
             TrackedSpatialQuery::Shapecast {
@@ -703,7 +705,7 @@ fn debug_render_tracked_spatial_queries(
                     shape_color,
                     point_color,
                     normal_color,
-                    **length_unit,
+                    length_unit,
                 );
             }
             TrackedSpatialQuery::PointProjection { point, projection } => {
@@ -717,20 +719,20 @@ fn debug_render_tracked_spatial_queries(
                 {
                     gizmos.circle_2d(
                         projection.f32(),
-                        0.1 * **length_unit as f32,
+                        0.1 * length_unit as f32,
                         projection_color,
                     );
-                    gizmos.circle_2d(point.f32(), 0.1 * **length_unit as f32, origin_color);
+                    gizmos.circle_2d(point.f32(), 0.1 * length_unit as f32, origin_color);
                 }
 
                 #[cfg(feature = "3d")]
                 {
                     gizmos.sphere(
                         projection.f32(),
-                        0.1 * **length_unit as f32,
+                        0.1 * length_unit as f32,
                         projection_color,
                     );
-                    gizmos.sphere(point.f32(), 0.1 * **length_unit as f32, origin_color);
+                    gizmos.sphere(point.f32(), 0.1 * length_unit as f32, origin_color);
                 }
             }
             TrackedSpatialQuery::ShapeIntersections {
